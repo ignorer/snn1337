@@ -27,3 +27,10 @@
 *.exe
 *.out
 *.app
+
+# IntelliJ Settings Directories
+.idea/
+
+# CMake Build Results
+cmake-build-debug/
+cmake-build-relese/
