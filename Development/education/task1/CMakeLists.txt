@@ -1,0 +1,17 @@
+cmake_minimum_required(VERSION 2.8.4)
+project(task1)
+
+find_package(OpenCL)
+
+add_subdirectory(ignorer)
+#add_subdirectory(annnvl)
+#add_subdirectory(Cheshear)
+#add_subdirectory(demikandr)
+#add_subdirectory(egdeliya)
+#add_subdirectory(kitnoel)
+#add_subdirectory(nmakeenkov)
+#add_subdirectory(okalitova)
+#add_subdirectory(SemyonKozloff)
+#add_subdirectory(TheYarick)
+#add_subdirectory(yuri-pechatnov)
+#add_subdirectory(zuev-stepan)
