@@ -11,7 +11,8 @@
 
 const std::size_t N = 5;
 
-void fillMatrix(cl_int** matrix, std::size_t n) {
+template<std::size_t n>
+void fillMatrix(auto matrix[n][n]) {
     std::random_device randomDevice;
     std::default_random_engine engine(randomDevice());
     std::uniform_int_distribution<cl_int> uniformDistribution(1, 100);
@@ -23,7 +24,17 @@ void fillMatrix(cl_int** matrix, std::size_t n) {
     }
 }
 
-void printMatrix(cl_int** matrix, std::size_t n) {
+template<std::size_t n>
+void fillMatrix(auto matrix[n][n], auto value) {
+    for (std::size_t i = 0; i < n; ++i) {
+        for (std::size_t j = 0; j < n; ++j) {
+            matrix[i][j] = value;
+        }
+    }
+}
+
+template<std::size_t n>
+void printMatrix(auto matrix[n][n]) {
     for (std::size_t i = 0; i < n; ++i) {
         for (std::size_t j = 0; j < n; ++j) {
             std::cout << matrix[i][j] << ' ';
@@ -46,7 +57,7 @@ int main() {
 
         cl_context_properties properties[] =
                 {CL_CONTEXT_PLATFORM, (cl_context_properties)(availablePlatforms[0])(), 0};
-        cl::Context context(CL_DEVICE_TYPE_GPU, properties); // add properties?
+        cl::Context context(CL_DEVICE_TYPE_GPU, properties);
         std::vector<cl::Device> devices = context.getInfo<CL_CONTEXT_DEVICES>();
 
         cl::CommandQueue queue(context, devices[0]);
@@ -60,28 +71,23 @@ int main() {
 
         cl::Kernel kernel(program, "multiplier");
 
-        auto a = new cl_int*[N];
-        auto b = new cl_int*[N];
-        auto c = new cl_int*[N];
-        for (std::size_t i = 0; i < N; ++i) {
-            a[i] = new cl_int[N];
-            b[i] = new cl_int[N];
-            c[i] = new cl_int[N];
-        }
-        ::fillMatrix(a, N);
-        ::fillMatrix(b, N);
+        cl_int a[N][N], b[N][N], c[N][N];
 
-        ::printMatrix(a, N);
+        ::fillMatrix(a);
+        ::fillMatrix(b);
+        ::fillMatrix(c, 0);
+
+        ::printMatrix(a);
         std::cout << 'X' << std::endl;
-        ::printMatrix(b, N);
+        ::printMatrix(b);
         std::cout << '=' << std::endl;
 
         std::size_t matrixMemorySize = N * N * sizeof(cl_int);
 
         cl::Buffer aBuffer(context, CL_MEM_READ_ONLY, matrixMemorySize);
         cl::Buffer bBuffer(context, CL_MEM_READ_ONLY, matrixMemorySize);
-        cl::Buffer cBuffer(context, CL_MEM_WRITE_ONLY, matrixMemorySize);
-        cl::Buffer nBuffer(context, CL_MEM_READ_ONLY, sizeof(std::size_t));
+        cl::Buffer cBuffer(context, CL_MEM_READ_WRITE, matrixMemorySize);
+        cl::Buffer nBuffer(context, CL_MEM_READ_WRITE, sizeof(std::size_t));
         queue.enqueueWriteBuffer(aBuffer, CL_TRUE, 0, matrixMemorySize, a);
         queue.enqueueWriteBuffer(bBuffer, CL_TRUE, 0, matrixMemorySize, b);
         queue.enqueueWriteBuffer(cBuffer, CL_TRUE, 0, matrixMemorySize, c);
@@ -97,17 +103,7 @@ int main() {
 
         event.wait();
 
-        ::printMatrix(c, N);
-
-        for (std::size_t i = 0; i < N; ++i) {
-            delete a[i];
-            delete b[i];
-            delete c[i];
-        }
-        delete a;
-        delete b;
-        delete c;
-
+        ::printMatrix(c);
     }
     catch (cl_int err) {
         std::cerr << "ERROR: " << err << std::endl;
