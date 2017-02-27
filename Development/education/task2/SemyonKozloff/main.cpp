@@ -4,15 +4,16 @@
 #include <memory>
 #include <iterator>
 #include <random>
+#include <chrono>
 
 #define __CL_ENABLE_EXCEPTIONS
 
 #include <cl.hpp>
 
-const std::size_t N = 5;
+const std::size_t N = 1000;
 const std::string fileName = "kernel.cl";
 
-void fillMatrix(cl_int matrix[N * N]) {
+void fillMatrix(cl_int* matrix) {
     std::random_device randomDevice;
 	std::default_random_engine engine(randomDevice());
 	std::uniform_int_distribution<cl_int> uniformDistribution(1, 100);
@@ -24,7 +25,7 @@ void fillMatrix(cl_int matrix[N * N]) {
     }
 }
 
-void fillMatrix(cl_int matrix[N * N], cl_int value) {
+void fillMatrix(cl_int* matrix, cl_int value) {
     for (std::size_t i = 0; i < N; ++i) {
         for (std::size_t j = 0; j < N; ++j) {
             matrix[i * N + j] = value;
@@ -32,7 +33,7 @@ void fillMatrix(cl_int matrix[N * N], cl_int value) {
     }
 }
 
-void printMatrix(cl_int matrix[N * N]) {
+void printMatrix(cl_int* matrix) {
     for (std::size_t i = 0; i < N; ++i) {
         for (std::size_t j = 0; j < N; ++j) {
             std::cout << matrix[i * N + j] << ' ';
@@ -43,16 +44,18 @@ void printMatrix(cl_int matrix[N * N]) {
 
 int main() {
 
-	cl_int a[N * N], b[N * N], c[N * N];
+	auto a = std::make_unique<cl_int[]>(N * N);
+	auto b = std::make_unique<cl_int[]>(N * N);
+	auto c = std::make_unique<cl_int[]>(N * N);
 
-	::fillMatrix(a);
-	::fillMatrix(b);
-	::fillMatrix(c, 0);
-
-	::printMatrix(a);
+	::fillMatrix(a.get());
+	::fillMatrix(b.get());
+	/*
+	::printMatrix(a.get());
 	std::cout << 'X' << std::endl;
-	::printMatrix(b);
+	::printMatrix(b.get());
 	std::cout << '=' << std::endl;
+	 */
 
 	cl::STRING_CLASS buildInfoLog;
 
@@ -92,9 +95,9 @@ int main() {
         cl::Buffer bBuffer(context, CL_MEM_READ_ONLY, matrixMemorySize);
         cl::Buffer cBuffer(context, CL_MEM_READ_WRITE, matrixMemorySize);
         cl::Buffer nBuffer(context, CL_MEM_READ_ONLY, sizeof(std::size_t));
-        queue.enqueueWriteBuffer(aBuffer, CL_TRUE, 0, matrixMemorySize, a);
-        queue.enqueueWriteBuffer(bBuffer, CL_TRUE, 0, matrixMemorySize, b);
-        queue.enqueueWriteBuffer(cBuffer, CL_TRUE, 0, matrixMemorySize, c);
+        queue.enqueueWriteBuffer(aBuffer, CL_TRUE, 0, matrixMemorySize, a.get());
+        queue.enqueueWriteBuffer(bBuffer, CL_TRUE, 0, matrixMemorySize, b.get());
+        queue.enqueueWriteBuffer(cBuffer, CL_TRUE, 0, matrixMemorySize, c.get());
         queue.enqueueWriteBuffer(nBuffer, CL_TRUE, 0, sizeof(std::size_t), &N);
         kernel.setArg(0, aBuffer);
         kernel.setArg(1, bBuffer);
@@ -102,18 +105,25 @@ int main() {
         kernel.setArg(3, nBuffer);
 
         cl::Event event;
+
+		auto start = std::chrono::steady_clock::now();
         queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(N), cl::NullRange, nullptr, &event);
-        queue.enqueueReadBuffer(cBuffer, CL_TRUE, 0, matrixMemorySize, c);
+		event.wait();
+		auto end = std::chrono::steady_clock::now();
 
-        event.wait();
+		auto elapsed = end - start;
+		auto elapsedMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
+		std::cout << elapsedMilliseconds << std::endl;
 
-        ::printMatrix(c);
+		queue.enqueueReadBuffer(cBuffer, CL_TRUE, 0, matrixMemorySize, c.get());
     }
     catch (cl::Error& error) {
         std::cerr << "ERROR: " << error.err() << std::endl;
 	    std::cerr << error.what() << std::endl;
         return EXIT_FAILURE;
     }
+
+	//::printMatrix(c.get());
 
     return EXIT_SUCCESS;
 }
