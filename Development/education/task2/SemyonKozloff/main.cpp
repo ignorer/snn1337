@@ -3,41 +3,39 @@
 #include <fstream>
 #include <memory>
 #include <iterator>
-
-#include <cl.hpp>
 #include <random>
 
 #define __CL_ENABLE_EXCEPTIONS
 
+#include <cl.hpp>
+
 const std::size_t N = 5;
+const std::string fileName = "kernel.cl";
 
-template<std::size_t n>
-void fillMatrix(auto matrix[n][n]) {
+void fillMatrix(cl_int matrix[N * N]) {
     std::random_device randomDevice;
-    std::default_random_engine engine(randomDevice());
-    std::uniform_int_distribution<cl_int> uniformDistribution(1, 100);
+	std::default_random_engine engine(randomDevice());
+	std::uniform_int_distribution<cl_int> uniformDistribution(1, 100);
 
-    for (std::size_t i = 0; i < n; ++i) {
-        for (std::size_t j = 0; j < n; ++j) {
-            matrix[i][j] = uniformDistribution(engine) % 10;
+    for (std::size_t i = 0; i < N; ++i) {
+        for (std::size_t j = 0; j < N; ++j) {
+            matrix[i * N + j] = uniformDistribution(engine) % 10;
         }
     }
 }
 
-template<std::size_t n>
-void fillMatrix(auto matrix[n][n], auto value) {
-    for (std::size_t i = 0; i < n; ++i) {
-        for (std::size_t j = 0; j < n; ++j) {
-            matrix[i][j] = value;
+void fillMatrix(cl_int matrix[N * N], cl_int value) {
+    for (std::size_t i = 0; i < N; ++i) {
+        for (std::size_t j = 0; j < N; ++j) {
+            matrix[i * N + j] = value;
         }
     }
 }
 
-template<std::size_t n>
-void printMatrix(auto matrix[n][n]) {
-    for (std::size_t i = 0; i < n; ++i) {
-        for (std::size_t j = 0; j < n; ++j) {
-            std::cout << matrix[i][j] << ' ';
+void printMatrix(cl_int matrix[N * N]) {
+    for (std::size_t i = 0; i < N; ++i) {
+        for (std::size_t j = 0; j < N; ++j) {
+            std::cout << matrix[i * N + j] << ' ';
         }
         std::cout << std::endl;
     }
@@ -45,9 +43,7 @@ void printMatrix(auto matrix[n][n]) {
 
 int main() {
 
-    const std::string fileName = "kernel.cl";
-
-    try {
+	try {
         std::vector<cl::Platform> availablePlatforms;
         cl::Platform::get(&availablePlatforms);
         if (availablePlatforms.size() == 0) {
@@ -71,7 +67,7 @@ int main() {
 
         cl::Kernel kernel(program, "multiplier");
 
-        cl_int a[N][N], b[N][N], c[N][N];
+        cl_int a[N * N], b[N * N], c[N * N];
 
         ::fillMatrix(a);
         ::fillMatrix(b);
@@ -84,8 +80,8 @@ int main() {
 
         std::size_t matrixMemorySize = N * N * sizeof(cl_int);
 
-        cl::Buffer aBuffer(context, CL_MEM_READ_ONLY, matrixMemorySize);
-        cl::Buffer bBuffer(context, CL_MEM_READ_ONLY, matrixMemorySize);
+        cl::Buffer aBuffer(context, CL_MEM_READ_WRITE, matrixMemorySize);
+        cl::Buffer bBuffer(context, CL_MEM_READ_WRITE, matrixMemorySize);
         cl::Buffer cBuffer(context, CL_MEM_READ_WRITE, matrixMemorySize);
         cl::Buffer nBuffer(context, CL_MEM_READ_WRITE, sizeof(std::size_t));
         queue.enqueueWriteBuffer(aBuffer, CL_TRUE, 0, matrixMemorySize, a);
@@ -105,8 +101,8 @@ int main() {
 
         ::printMatrix(c);
     }
-    catch (cl_int err) {
-        std::cerr << "ERROR: " << err << std::endl;
+    catch (cl::Error& error) {
+        std::cerr << "ERROR: " << error.what() << std::endl;
         return EXIT_FAILURE;
     }
 
