@@ -6,17 +6,12 @@
 
 #define __CL_ENABLE_EXCEPTIONS
 
-#if defined(__APPLE__) || defined(__MACOSX)
-#include <OpenCL/cl.hpp>
-#else
-#include <CL/cl.hpp>
-#endif
+#include <cl.hpp>
 
 const std::size_t N = 10;
+const std::string fileName = "kernel.cl";
 
 int main() {
-
-    const std::string fileName = "kernel.cl";
 
     try {
         std::vector<cl::Platform> availablePlatforms;
@@ -28,7 +23,7 @@ int main() {
 
         cl_context_properties properties[] =
                 {CL_CONTEXT_PLATFORM, (cl_context_properties)(availablePlatforms[0])(), 0};
-        cl::Context context(CL_DEVICE_TYPE_DEFAULT, properties); // add properties?
+        cl::Context context(CL_DEVICE_TYPE_DEFAULT, properties);
         std::vector<cl::Device> devices = context.getInfo<CL_CONTEXT_DEVICES>();
 
         cl::CommandQueue queue(context, devices[0]);
@@ -51,8 +46,7 @@ int main() {
         queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(N), cl::NullRange, nullptr, &event);
         queue.enqueueReadBuffer(buffer, CL_TRUE, 0, N * sizeof(cl_int), memory.get());
 
-        for (std::size_t i = 0; i < N; ++i)
-        {
+        for (std::size_t i = 0; i < N; ++i) {
             std::cout << memory.get()[i] << ' ';
         }
 
