@@ -1,11 +1,11 @@
 
-__kernel void multiplier(__global int* a, __global int* b, __global int* с, int n) {
-    int k, i, gid;
-	gid = get_global_id(0);
-	for (k = 0; k < n; ++k) {
-        c[gid * n + k] = 0;
-        for (i = 0; i < n; ++i) {
-            c[gid * n + k] += a[gid * n + i] * b[i * n + k];
+__kernel void multiplier(__global int* a, __global int* b, __global int* c, int* n) {
+	int dim = n[0];
+	int gid = get_global_id(0);
+	for (int k = 0; k < dim; ++k) {
+        c[gid * dim + k] = 0;
+        for (int i = 0; i < dim; ++i) {
+            c[gid * dim + k] += a[gid * dim + i] * b[i * dim + k];
         }
     }
 }

@@ -43,12 +43,24 @@ void printMatrix(cl_int matrix[N * N]) {
 
 int main() {
 
+	cl_int a[N * N], b[N * N], c[N * N];
+
+	::fillMatrix(a);
+	::fillMatrix(b);
+	::fillMatrix(c, 0);
+
+	::printMatrix(a);
+	std::cout << 'X' << std::endl;
+	::printMatrix(b);
+	std::cout << '=' << std::endl;
+
+	cl::STRING_CLASS buildInfoLog;
+
 	try {
         std::vector<cl::Platform> availablePlatforms;
         cl::Platform::get(&availablePlatforms);
         if (availablePlatforms.size() == 0) {
-            std::cout << "No available platforms." << std::endl;
-            return EXIT_FAILURE;
+            throw cl::Error(1, "No available platforms.");
         }
 
         cl_context_properties properties[] =
@@ -63,27 +75,23 @@ int main() {
 
         cl::Program::Sources kernelSources{std::make_pair(fileContent.c_str(), fileContent.length())};
         cl::Program program(context, kernelSources);
-        program.build(devices);
+
+		try {
+			program.build(devices);
+		}
+		catch (cl::Error& error) {
+			program.getBuildInfo(devices[0], CL_PROGRAM_BUILD_LOG, &buildInfoLog);
+			throw cl::Error(error.err(), buildInfoLog.c_str());
+		}
 
         cl::Kernel kernel(program, "multiplier");
 
-        cl_int a[N * N], b[N * N], c[N * N];
-
-        ::fillMatrix(a);
-        ::fillMatrix(b);
-        ::fillMatrix(c, 0);
-
-        ::printMatrix(a);
-        std::cout << 'X' << std::endl;
-        ::printMatrix(b);
-        std::cout << '=' << std::endl;
-
         std::size_t matrixMemorySize = N * N * sizeof(cl_int);
 
-        cl::Buffer aBuffer(context, CL_MEM_READ_WRITE, matrixMemorySize);
-        cl::Buffer bBuffer(context, CL_MEM_READ_WRITE, matrixMemorySize);
+        cl::Buffer aBuffer(context, CL_MEM_READ_ONLY, matrixMemorySize);
+        cl::Buffer bBuffer(context, CL_MEM_READ_ONLY, matrixMemorySize);
         cl::Buffer cBuffer(context, CL_MEM_READ_WRITE, matrixMemorySize);
-        cl::Buffer nBuffer(context, CL_MEM_READ_WRITE, sizeof(std::size_t));
+        cl::Buffer nBuffer(context, CL_MEM_READ_ONLY, sizeof(std::size_t));
         queue.enqueueWriteBuffer(aBuffer, CL_TRUE, 0, matrixMemorySize, a);
         queue.enqueueWriteBuffer(bBuffer, CL_TRUE, 0, matrixMemorySize, b);
         queue.enqueueWriteBuffer(cBuffer, CL_TRUE, 0, matrixMemorySize, c);
@@ -102,7 +110,8 @@ int main() {
         ::printMatrix(c);
     }
     catch (cl::Error& error) {
-        std::cerr << "ERROR: " << error.what() << std::endl;
+        std::cerr << "ERROR: " << error.err() << std::endl;
+	    std::cerr << error.what() << std::endl;
         return EXIT_FAILURE;
     }
 
