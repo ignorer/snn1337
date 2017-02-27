@@ -62,7 +62,7 @@ int main() {
 	try {
 		std::vector<cl::Platform> availablePlatforms;
 		cl::Platform::get(&availablePlatforms);
-		if (availablePlatforms.size() == 0) {
+		if (availablePlatforms.empty()) {
 			throw cl::Error(1, "No available platforms.");
 		}
 
@@ -94,21 +94,17 @@ int main() {
 		cl::Buffer aBuffer(context, CL_MEM_READ_ONLY, matrixMemorySize);
 		cl::Buffer bBuffer(context, CL_MEM_READ_ONLY, matrixMemorySize);
 		cl::Buffer cBuffer(context, CL_MEM_READ_WRITE, matrixMemorySize);
-		cl::Buffer nBuffer(context, CL_MEM_READ_ONLY, sizeof(std::size_t));
 		queue.enqueueWriteBuffer(aBuffer, CL_TRUE, 0, matrixMemorySize, a.get());
 		queue.enqueueWriteBuffer(bBuffer, CL_TRUE, 0, matrixMemorySize, b.get());
 		queue.enqueueWriteBuffer(cBuffer, CL_TRUE, 0, matrixMemorySize, c.get());
-		queue.enqueueWriteBuffer(nBuffer, CL_TRUE, 0, sizeof(std::size_t), &N);
 		kernel.setArg(0, aBuffer);
 		kernel.setArg(1, bBuffer);
 		kernel.setArg(2, cBuffer);
-		kernel.setArg(3, nBuffer);
-
-		cl::Event event;
+		kernel.setArg(3, static_cast<unsigned>(N));
 
 		auto start = std::chrono::steady_clock::now();
-		queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(N), cl::NullRange, nullptr, &event);
-		event.wait();
+		queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(N));
+		queue.finish();
 		auto end = std::chrono::steady_clock::now();
 
 		auto elapsed = end - start;
