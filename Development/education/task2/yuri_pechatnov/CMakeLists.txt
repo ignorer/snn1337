@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.6)
 
 set(MODULE_NAME yuri-pechatnov)
+set(task2_SOURCE_DIR ..)
 
 project(${MODULE_NAME})
 
@@ -10,7 +11,7 @@ find_package(OpenCL)
 
 # set include directories
 include_directories(${OpenCL_INCLUDE_DIRS})
-#include_directories(${task1_SOURCE_DIR}/include)
+include_directories(${task2_SOURCE_DIR}/include)
 
 # set source files
 set(SOURCE_FILES main.cpp)
