@@ -78,7 +78,7 @@ int main() {
 
         // create kernel functor
         auto kernel = cl::make_kernel<const cl::Buffer &, const cl::Buffer &, cl::Buffer &, cl_int>(program, "job");
-        kernel(cl::EnqueueArgs(queue, cl::NDRange(N)), bufferA, bufferB, bufferC, N).wait();
+        kernel(cl::EnqueueArgs(queue, cl::NDRange(N, N)), bufferA, bufferB, bufferC, N).wait();
 
         cl::copy(queue, bufferC, C.begin(), C.end());
         cout << chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start).count() << endl;
