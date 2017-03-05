@@ -6,7 +6,7 @@
 
 #define __CL_ENABLE_EXCEPTIONS
 
-static constexpr bool gDebugEnabled = true;
+static constexpr bool gDebugEnabled = false;
 #define debugStream\
     if (!gDebugEnabled) {}\
     else std::cout
@@ -41,14 +41,14 @@ std::tuple<cl::Kernel, cl::Context, cl::CommandQueue> get_kernel_and_shit(const 
 
 void print_matrix(int* a, size_t size)
 {
-    std::cout << "Matrix: \n";
+    debugStream << "Matrix: \n";
     for (size_t i = 0; i < size; ++i)
     {
         for (size_t j = 0; j < size; ++j)
         {
-            std::cout << std::setfill(' ') << std::setw(12) << a[i * size + j];
+            debugStream << std::setfill(' ') << std::setw(12) << a[i * size + j];
         }
-        std::cout << '\n';
+        debugStream << '\n';
     }
 }
 
