@@ -22,24 +22,24 @@ const string sourceCode = loadSourceCode("kernel.cl");
 
 int main() {
     unsigned N = 1000;
-    unsigned matrix_size = N * N;
+    unsigned matrixSize = N * N;
     try {
-        vector<cl::Platform> all_platforms;
-        cl::Platform::get(&all_platforms);
-        if (all_platforms.size() == 0) {
+        vector<cl::Platform> allPlatforms;
+        cl::Platform::get(&allPlatforms);
+        if (allPlatforms.size() == 0) {
             cout << " No platforms found. Check OpenCL installation!\n";
             exit(1);
         }
-        cl::Platform platform = all_platforms[0];
+        cl::Platform platform = allPlatforms[0];
         cout << "Using platform: " << platform.getInfo<CL_PLATFORM_NAME>() << "\n";
 
-        vector<cl::Device> all_devices;
-        platform.getDevices(CL_DEVICE_TYPE_ALL, &all_devices);
-        if (all_devices.size() == 0) {
+        vector<cl::Device> allDevices;
+        platform.getDevices(CL_DEVICE_TYPE_ALL, &allDevices);
+        if (allDevices.size() == 0) {
             cout << " No devices found. Check OpenCL installation!\n";
             exit(1);
         }
-        cl::Device device = all_devices[0];
+        cl::Device device = allDevices[0];
         cout << "Using device: " << device.getInfo<CL_DEVICE_NAME>() << "\n";
 
         cl::Context context(device);
@@ -53,15 +53,15 @@ int main() {
         try {
             program.build({device});
         }
-        catch (cl::Error &error) {
-            string build_log;
-            program.getBuildInfo(device, CL_PROGRAM_BUILD_LOG, &build_log);
-            throw build_log;
+        catch (cl::Error& error) {
+            string buildLog;
+            program.getBuildInfo(device, CL_PROGRAM_BUILD_LOG, &buildLog);
+            throw runtime_error(buildLog);
         }
         // reduced arrays
-        vector<cl_int> A(matrix_size);
-        vector<cl_int> B(matrix_size);
-        vector<cl_int> C(matrix_size);
+        vector<cl_int> A(matrixSize);
+        vector<cl_int> B(matrixSize);
+        vector<cl_int> C(matrixSize);
         for (int i = 0; i < N; ++i) {
             for (int j = 0; j < N; ++j) {
                 A[i * N + j] = rand() % 10;
@@ -77,18 +77,16 @@ int main() {
         cl::copy(queue, B.begin(), B.end(), bufferB);
 
         // create kernel functor
-        auto kernel = cl::make_kernel<const cl::Buffer &, const cl::Buffer &, cl::Buffer &, cl_int>(program, "job");
+        auto kernel = cl::make_kernel<const cl::Buffer&, const cl::Buffer&, cl::Buffer&, cl_int>(program, "job");
         kernel(cl::EnqueueArgs(queue, cl::NDRange(N, N)), bufferA, bufferB, bufferC, N).wait();
 
         cl::copy(queue, bufferC, C.begin(), C.end());
         cout << chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start).count() << endl;
-    }
-    catch (cl::Error &error) {
+    } catch (const cl::Error& error) {
         cerr << "ERROR: " << error.what() << "(" << error.err() << ")" << endl;
         return EXIT_FAILURE;
-    }
-    catch (string &log) {
-        cerr << log << endl;
+    } catch (const std::exception& e) {
+        cerr << e.what() << endl;
         return EXIT_FAILURE;
     }
     return 0;
