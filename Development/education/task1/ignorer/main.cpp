@@ -13,14 +13,13 @@
 using namespace std;
 using namespace chrono;
 
-cl::Device getRandomGPU() {
+cl::Device getRandomDevice(int type = CL_DEVICE_TYPE_ALL) {
     vector<cl::Device> devices;
-
     vector<cl::Platform> platforms;
     cl::Platform::get(&platforms);
     for (auto& platform : platforms) {
         try {
-            platform.getDevices(CL_DEVICE_TYPE_GPU, &devices);
+            platform.getDevices(type, &devices);
             if (!devices.empty()) {
                 return {devices.front()};
             }
@@ -31,31 +30,19 @@ cl::Device getRandomGPU() {
     throw std::runtime_error("device not found");
 }
 
-string readKernel(const string& filename) {
-    ifstream stream(filename);
-    string result;
-
-    while (stream) {
-        string temp;
-        getline(stream, temp);
-        result += temp + "\n";
-    }
-    return result;
-}
-
 int main() {
     size_t n = 10;
     vector<int> A(n, 0);
 
     try {
         // prepare
-        auto gpu = getRandomGPU();
+        auto gpu = getRandomDevice(CL_DEVICE_TYPE_GPU);
         cl::Context context(gpu);
         cl::CommandQueue commandQueue(context, gpu);
 
         // compile kernel
-        string sourceCode = readKernel("ignorerKernel.cl");
-        cl::Program program(context, sourceCode, true);
+        ifstream stream("ignorerKernel.cl");
+        cl::Program program(context, string(istreambuf_iterator<char>(stream), {}), true);
         cl::make_kernel<cl::Buffer> kernel(program, "fillArray");
 
         // run
