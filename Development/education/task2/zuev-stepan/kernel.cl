@@ -1,4 +1,4 @@
-__kernel void fuck(__global const int* a, __global const int* b, __global int* res, int size)
+__kernel void SimpleKernel(__global const int* a, __global const int* b, __global int* res, int size)
 {
     int x = get_global_id(0);
     int y = get_global_id(1);

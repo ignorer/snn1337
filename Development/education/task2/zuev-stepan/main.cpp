@@ -1,26 +1,37 @@
+#define __CL_ENABLE_EXCEPTIONS
+
 #include <cl.hpp>
 #include <iostream>
 #include <fstream>
 #include <memory>
 #include <iomanip>
 
-#define __CL_ENABLE_EXCEPTIONS
+class NullStream
+{
+public:
+    template <typename T>
+    NullStream& operator <<(const T& t)
+    {
+        return *this;
+    }
+};
 
-static constexpr bool gDebugEnabled = false;
-#define debugStream\
-    if (!gDebugEnabled) {}\
-    else std::cout
+#ifdef DEBUG
+#define debugOut std::cout
+#else
+auto debugOut = NullStream();
+#endif
 
-std::tuple<cl::Kernel, cl::Context, cl::CommandQueue> get_kernel_and_shit(const std::string& path, const std::string& name)
+std::tuple<cl::Kernel, cl::Context, cl::CommandQueue> getKernel(const std::string& path, const std::string& name)
 {
     // Find devices
     std::vector<cl::Platform> platforms;
     cl::Platform::get(&platforms);
-    debugStream << "Found " << platforms.size() << " platforms\n";
+    debugOut << "Found " << platforms.size() << " platforms\n";
 
     std::vector<cl::Device> devices;
     platforms[0].getDevices(CL_DEVICE_TYPE_ALL, &devices);
-    debugStream << "Found " << devices.size() << " devices for first platform\n";
+    debugOut << "Found " << devices.size() << " devices for first platform\n";
 
     std::vector<cl::Device> contextDevices;
     contextDevices.push_back(devices[0]);
@@ -30,25 +41,25 @@ std::tuple<cl::Kernel, cl::Context, cl::CommandQueue> get_kernel_and_shit(const 
     // Load kernel source
     std::ifstream sourceFile(path);
     std::string sourceStr(std::istreambuf_iterator<char>(sourceFile),(std::istreambuf_iterator<char>()));
-    debugStream << "Kernel source:\n" << sourceStr;
+    debugOut << "Kernel source:\n" << sourceStr;
 
     // Build kernel
     cl::Program program(context, cl::Program::Sources(1, std::make_pair(sourceStr.c_str(), sourceStr.size() + 1)));
-    debugStream << "Program built with code " << program.build(contextDevices) << "\n";
+    debugOut << "Program built with code " << program.build(contextDevices) << "\n";
     cl::Kernel kernel(program, name.c_str());
     return std::make_tuple(kernel, context, queue);
 }
 
 void print_matrix(int* a, size_t size)
 {
-    debugStream << "Matrix: \n";
+    debugOut << "Matrix: \n";
     for (size_t i = 0; i < size; ++i)
     {
         for (size_t j = 0; j < size; ++j)
         {
-            debugStream << std::setfill(' ') << std::setw(12) << a[i * size + j];
+            debugOut << std::setfill(' ') << std::setw(12) << a[i * size + j];
         }
-        debugStream << '\n';
+        debugOut << '\n';
     }
 }
 
@@ -57,7 +68,7 @@ int main(void)
     cl::Kernel kernel;
     cl::Context context;
     cl::CommandQueue queue;
-    std::tie(kernel, context, queue) = get_kernel_and_shit("kernel.cl", "fuck");
+    std::tie(kernel, context, queue) = getKernel("kernel.cl", "SimpleKernel");
 
     std::cout << "Enter size: ";
     int size;
@@ -87,7 +98,8 @@ int main(void)
 
     queue.finish();
     // Run kernel
-    debugStream << "Run status: " << queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(size, size), cl::NullRange) << '\n';
+    debugOut << "Run: "
+        << queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(size, size), cl::NullRange) << '\n'; // ZBS
     queue.finish();
     queue.enqueueReadBuffer(clResBuf, CL_TRUE, 0, size * size * sizeof(int), res.get());
 
