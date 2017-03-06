@@ -1,18 +1,16 @@
-#define __CL_ENABLE_EXCEPTIONS
-
 #include <iostream>
 #include <fstream>
 #include <memory>
 #include <iomanip>
 
+#define __CL_ENABLE_EXCEPTIONS
+
 #include <cl.hpp>
 
-class NullStream
-{
+class NullStream {
 public:
-    template <typename T>
-    NullStream& operator <<(const T& t)
-    {
+    template<typename T>
+    NullStream& operator<<(const T& t) {
         return *this;
     }
 };
@@ -23,8 +21,7 @@ public:
 auto debugOut = NullStream();
 #endif
 
-std::tuple<cl::Kernel, cl::Context, cl::CommandQueue> getKernel(const std::string& path, const std::string& name)
-{
+std::tuple<cl::Kernel, cl::Context, cl::CommandQueue> getKernel(const std::string& path, const std::string& name) {
     // Find devices
     std::vector<cl::Platform> platforms;
     cl::Platform::get(&platforms);
@@ -41,7 +38,7 @@ std::tuple<cl::Kernel, cl::Context, cl::CommandQueue> getKernel(const std::strin
 
     // Load kernel source
     std::ifstream sourceFile(path);
-    std::string sourceStr(std::istreambuf_iterator<char>(sourceFile),(std::istreambuf_iterator<char>()));
+    std::string sourceStr(std::istreambuf_iterator<char>(sourceFile), (std::istreambuf_iterator<char>()));
     debugOut << "Kernel source:\n" << sourceStr;
 
     // Build kernel
@@ -51,21 +48,17 @@ std::tuple<cl::Kernel, cl::Context, cl::CommandQueue> getKernel(const std::strin
     return std::make_tuple(kernel, context, queue);
 }
 
-void printMatrix(int* a, size_t size)
-{
+void printMatrix(int* a, size_t size) {
     debugOut << "Matrix: \n";
-    for (size_t i = 0; i < size; ++i)
-    {
-        for (size_t j = 0; j < size; ++j)
-        {
+    for (size_t i = 0; i < size; ++i) {
+        for (size_t j = 0; j < size; ++j) {
             debugOut << std::setfill(' ') << std::setw(12) << a[i * size + j];
         }
         debugOut << '\n';
     }
 }
 
-int main(void)
-{
+int main(void) {
     cl::Kernel kernel;
     cl::Context context;
     cl::CommandQueue queue;
@@ -78,8 +71,7 @@ int main(void)
     std::unique_ptr<int[]> b(new int[size * size]);
     std::unique_ptr<int[]> res(new int[size * size]);
     srand(1337);
-    for (size_t i = 0; i < size * size; ++i)
-    {
+    for (size_t i = 0; i < size * size; ++i) {
         a[i] = rand() % 228;
         b[i] = rand() % 228;
     }
@@ -91,7 +83,6 @@ int main(void)
     queue.enqueueWriteBuffer(clABuf, CL_FALSE, 0, size * size * sizeof(int), a.get());
     queue.enqueueWriteBuffer(clBBuf, CL_FALSE, 0, size * size * sizeof(int), b.get());
 
-
     kernel.setArg(0, clABuf);
     kernel.setArg(1, clBBuf);
     kernel.setArg(2, clResBuf);
@@ -100,7 +91,7 @@ int main(void)
     queue.finish();
     // Run kernel
     debugOut << "Run: "
-        << queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(size, size), cl::NullRange) << '\n'; // ZBS
+            << queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(size, size), cl::NullRange) << '\n'; // ZBS
     queue.finish();
     queue.enqueueReadBuffer(clResBuf, CL_TRUE, 0, size * size * sizeof(int), res.get());
 
