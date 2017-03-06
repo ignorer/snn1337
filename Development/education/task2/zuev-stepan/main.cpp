@@ -50,7 +50,7 @@ std::tuple<cl::Kernel, cl::Context, cl::CommandQueue> getKernel(const std::strin
     return std::make_tuple(kernel, context, queue);
 }
 
-void print_matrix(int* a, size_t size)
+void printMatrix(int* a, size_t size)
 {
     debugOut << "Matrix: \n";
     for (size_t i = 0; i < size; ++i)
@@ -103,9 +103,9 @@ int main(void)
     queue.finish();
     queue.enqueueReadBuffer(clResBuf, CL_TRUE, 0, size * size * sizeof(int), res.get());
 
-    print_matrix(a.get(), size);
-    print_matrix(b.get(), size);
-    print_matrix(res.get(), size);
+    printMatrix(a.get(), size);
+    printMatrix(b.get(), size);
+    printMatrix(res.get(), size);
 
     return 0;
 }
