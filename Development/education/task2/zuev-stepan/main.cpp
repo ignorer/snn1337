@@ -1,10 +1,11 @@
 #define __CL_ENABLE_EXCEPTIONS
 
-#include <cl.hpp>
 #include <iostream>
 #include <fstream>
 #include <memory>
 #include <iomanip>
+
+#include <cl.hpp>
 
 class NullStream
 {
