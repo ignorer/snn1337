@@ -1,18 +1,16 @@
-#define __CL_ENABLE_EXCEPTIONS
-
 #include <iostream>
 #include <fstream>
 #include <memory>
 #include <iomanip>
 
+#define __CL_ENABLE_EXCEPTIONS
+
 #include <cl.hpp>
 
-class NullStream
-{
+class NullStream {
 public:
-    template <typename T>
-    NullStream& operator <<(const T& t)
-    {
+    template<typename T>
+    NullStream& operator<<(const T& t) {
         return *this;
     }
 };
@@ -23,8 +21,7 @@ public:
 auto debugOut = NullStream();
 #endif
 
-std::tuple<cl::Kernel, cl::Context, cl::CommandQueue> getKernel(const std::string& path, const std::string& name)
-{
+std::tuple<cl::Kernel, cl::Context, cl::CommandQueue> getKernel(const std::string& path, const std::string& name) {
     // Find devices
     std::vector<cl::Platform> platforms;
     cl::Platform::get(&platforms);
@@ -41,7 +38,7 @@ std::tuple<cl::Kernel, cl::Context, cl::CommandQueue> getKernel(const std::strin
 
     // Load kernel source
     std::ifstream sourceFile(path);
-    std::string sourceStr(std::istreambuf_iterator<char>(sourceFile),(std::istreambuf_iterator<char>()));
+    std::string sourceStr(std::istreambuf_iterator<char>(sourceFile), (std::istreambuf_iterator<char>()));
     debugOut << "Kernel source:\n" << sourceStr;
 
     // Build kernel
@@ -51,8 +48,7 @@ std::tuple<cl::Kernel, cl::Context, cl::CommandQueue> getKernel(const std::strin
     return std::make_tuple(kernel, context, queue);
 }
 
-int main(void)
-{
+int main(void) {
     cl::Kernel kernel;
     cl::Context context;
     cl::CommandQueue queue;
@@ -73,8 +69,7 @@ int main(void)
     queue.enqueueReadBuffer(clBuf, CL_TRUE, 0, size * sizeof(int), res.get());
 
     // Print result
-    for (size_t i = 0; i < size; ++i)
-    {
+    for (size_t i = 0; i < size; ++i) {
         debugOut << res[i] << ' ';
     }
 
