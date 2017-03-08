@@ -2799,7 +2799,7 @@ class NestingState(object):
         # Check that access keywords are indented +1 space.  Skip this
         # check if the keywords are not preceded by whitespaces.
         indent = access_match.group(1)
-        if (len(indent) != classinfo.class_indent + 1 and
+        if (len(indent) != classinfo.class_indent + 2 and
             Match(r'^\s*$', indent)):
           if classinfo.is_struct:
             parent = 'struct ' + classinfo.name
@@ -2809,7 +2809,7 @@ class NestingState(object):
           if access_match.group(3):
             slots = access_match.group(3)
           error(filename, linenum, 'whitespace/indent', 3,
-                '%s%s: should be indented +1 space inside %s' % (
+                '%s%s: should be indented +2 space inside %s' % (
                     access_match.group(2), slots, parent))
 
     # Consume braces or semicolons from what's left of the line
@@ -6400,8 +6400,7 @@ def ParseArguments(args):
   if recursive:
     filenames = _ExpandDirectories(filenames)
 
-  if _excludes:
-    filenames = _FilterExcludedFiles(filenames)
+  filenames = _FilterExcludedFiles(filenames)
 
   _SetOutputFormat(output_format)
   _SetVerboseLevel(verbosity)
@@ -6446,8 +6445,17 @@ def _FilterExcludedFiles(filenames):
   """Filters out files listed in the --exclude command line switch. File paths
   in the switch are evaluated relative to the current working directory
   """
+  class CheckerForSubstring:
+    def __init__(self, directory_name):
+      self.directory_name = directory_name
+    def __contains__(self, item):
+      return item.find(self.directory_name) != -1
+      
+  cmake_directory = CheckerForSubstring("/CMakeFiles/")
+    
   exclude_paths = [os.path.abspath(f) for f in _excludes]
-  return [f for f in filenames if os.path.abspath(f) not in exclude_paths]
+  return [f for f in filenames if os.path.abspath(f) not in exclude_paths and
+      os.path.abspath(f) not in cmake_directory]
 
 def main():
   filenames = ParseArguments(sys.argv[1:])
