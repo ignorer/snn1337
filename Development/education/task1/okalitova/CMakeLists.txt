@@ -1,13 +1,10 @@
 cmake_minimum_required(VERSION 3.6)
 
 set(MODULE_NAME okalitova)
-set(task1_SOURCE_DIR ..)
 
 project(${MODULE_NAME})
 
 set(CMAKE_CXX_STANDARD 14)
-
-find_package(OpenCL)
 
 # set include directories
 include_directories(${OpenCL_INCLUDE_DIRS})

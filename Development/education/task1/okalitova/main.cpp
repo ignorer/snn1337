@@ -11,12 +11,7 @@
 
 void printError(cl::Error err) {
     std::cout << "Exception\n";
-    std::cerr << "ERROR: "
-    << err.what()
-    << "("
-    << err_code(err.err())
-    << ")"
-    << std::endl;
+    std::cerr << "ERROR: " << err.what() << "(" << err_code(err.err()) << ")" << std::endl;
 }
 
 std::unique_ptr<int[]> performTaskOnDevice(cl::Device device, int n, std::string filename) {
@@ -35,7 +30,7 @@ std::unique_ptr<int[]> performTaskOnDevice(cl::Device device, int n, std::string
         cl::Kernel kernel(program, "arrayIndeces");
 
         cl::Buffer clmOutputVector = cl::Buffer(context,
-                                                CL_MEM_READ_WRITE, n * sizeof(int));
+            CL_MEM_READ_WRITE, n * sizeof(int));
         kernel.setArg(0, clmOutputVector);
 
         queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(n), cl::NullRange);
@@ -78,7 +73,7 @@ int main(int argv, char** argc) {
         cl::Device device = getDevice();
 
         std::unique_ptr<int[]> ans = performTaskOnDevice(device, n, filename);
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < n; i++) {
             std::cout << ans.get()[i] << " ";
         }
     } catch (cl::Error err) {
