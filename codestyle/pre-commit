@@ -11,6 +11,14 @@ PROJECT_PATH="."
 
 CODESTYLE_PATH="$PROJECT_PATH/codestyle"
 
+#if [ -e astyle ]
+#then
+    astyle --options=$CODESTYLE_PATH/astyle.conf *.cpp *.h
+#else
+#    echo "Astyle have not been found (so will not be used)"
+#fi
+
+
 CPPLINT_LOG="$CODESTYLE_PATH/cpplint.stderr"
 
 if ! sh -c "python $CODESTYLE_PATH/cpplint.py \
@@ -32,6 +40,9 @@ else
 fi
 
 rm -f $CPPLINT_LOG
+
+
+
 
 if git rev-parse --verify HEAD >/dev/null 2>&1
 then
