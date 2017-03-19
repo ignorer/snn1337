@@ -17,4 +17,4 @@ add_executable(${MODULE_NAME} ${SOURCE_FILES})
 target_link_libraries(${MODULE_NAME} ${OpenCL_LIBRARY})
 
 # copy kernel file to bin directory
-#file(COPY myFirstKernel.cl DESTINATION .)
+file(COPY OpenCLFile1.cl DESTINATION .)
