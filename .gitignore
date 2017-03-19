@@ -27,3 +27,9 @@
 *.exe
 *.out
 *.app
+
+
+# Astyle original files
+*.orig
+
+# Cpplint files

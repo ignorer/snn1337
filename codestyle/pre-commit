@@ -12,6 +12,9 @@ PROJECT_PATH="."
 CODESTYLE_PATH="$PROJECT_PATH/codestyle"
 
 # Astyle part
+
+echo -e "\033[32;1;40mAstyle processing \033[0m"
+
 ASTYLE_CONF="$CODESTYLE_PATH/astyle.conf"
 
 if ! [ -f $ASTYLE_CONF ]
@@ -22,8 +25,10 @@ else
 fi
 
 # Remove trailing spaces
-echo "Removing trailing spaces"
+echo -e "\033[32;1;40mSED processing: removing trailing spaces \033[0m"
 find $PROJECT_PATH -regex ".*\(cpp\|h\)$" -type f -print0 | xargs -0 sed -i 's/[[:space:]]*$//'
+
+echo -e "\033[32;1;40mCpplint.py processing: make warnings \033[0m"
 
 # Check with cpplint
 CPPLINT_LOG="$CODESTYLE_PATH/cpplint.stderr"
