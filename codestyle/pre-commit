@@ -11,14 +11,21 @@ PROJECT_PATH="."
 
 CODESTYLE_PATH="$PROJECT_PATH/codestyle"
 
-#if [ -e astyle ]
-#then
-    astyle --options=$CODESTYLE_PATH/astyle.conf *.cpp *.h
-#else
-#    echo "Astyle have not been found (so will not be used)"
-#fi
+# Astyle part
+ASTYLE_CONF="$CODESTYLE_PATH/astyle.conf"
 
+if ! [ -f $ASTYLE_CONF ]
+then
+	echo "No astyle conf"
+else
+    astyle --options=$ASTYLE_CONF "*.cpp" "*.h"
+fi
 
+# Remove trailing spaces
+echo "Removing trailing spaces"
+find $PROJECT_PATH -regex ".*\(cpp\|h\)$" -type f -print0 | xargs -0 sed -i 's/[[:space:]]*$//'
+
+# Check with cpplint
 CPPLINT_LOG="$CODESTYLE_PATH/cpplint.stderr"
 
 if ! sh -c "python $CODESTYLE_PATH/cpplint.py \
