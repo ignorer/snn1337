@@ -1,16 +1,12 @@
 cmake_minimum_required(VERSION 3.3)
-
-set(MODULE_NAME yuri-pechatnov)
-set(task2_SOURCE_DIR ..)
+set(MODULE_NAME Cheshear)
 
 project(${MODULE_NAME})
 
 set(CMAKE_CXX_STANDARD 14)
 
-find_package(OpenCL)
-
 # set include directories
-include_directories(${OpenCL_INCLUDE_DIRS})
+include_directories(${OPENCL_INCLUDE_DIRS})
 include_directories(${task2_SOURCE_DIR}/include)
 
 # set source files
