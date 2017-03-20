@@ -4,7 +4,7 @@ project(task2)
 find_package(OpenCL)
 
 #add_subdirectory(annnvl)
-#add_subdirectory(Cheshear)
+add_subdirectory(Cheshear)
 #add_subdirectory(demikandr)
 #add_subdirectory(egdeliya)
 add_subdirectory(kitnoel)
