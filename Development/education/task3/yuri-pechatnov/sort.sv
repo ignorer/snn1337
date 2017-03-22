@@ -30,7 +30,7 @@ module sort(clk, rst, cmd, in_data, out_data);
     .in_data(in_buff),
     .out_data(sorted_buff)
   );
-  
+
   int total_counter;
   logic [0:MAX_LEN - 1][INT_MSB:0] total;
   
@@ -46,13 +46,13 @@ module sort(clk, rst, cmd, in_data, out_data);
     else
     begin
       case (cmd)
-        2'b01 : 
-        begin 
+        2'b01 :
+        begin
           in_buff[in_buff_counter] = in_data;
           in_buff_counter = in_buff_counter + 1;
-        end 
+        end
         2'b10 :
-        begin  
+        begin
           total_counter = -1;
           total[0:4] = sorted_buff;
           // copy buff to total
@@ -61,8 +61,8 @@ module sort(clk, rst, cmd, in_data, out_data);
         begin
           total_counter = total_counter + 1;
         end
-      endcase   
-    end     
+      endcase
+    end
   end
 
 endmodule
