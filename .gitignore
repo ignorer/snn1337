@@ -34,3 +34,8 @@
 # CMake Build Results
 cmake-build-debug/
 cmake-build-relese/
+
+# Verilog and modelsim generated files
+*.bak
+*.mpf
+*.mti
