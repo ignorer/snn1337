@@ -1,0 +1,2 @@
+/home/nimloth/coding/6sem/snn1337/Development/education/task1/ignorer/CMakeFiles/ignorer.dir
+/home/nimloth/coding/6sem/snn1337/Development/education/task1/okalitova/CMakeFiles/okalitova.dir
