@@ -1,3 +1,7 @@
+#!/usr/bin/python
+
+import sys
+
 def generate_layer_code(num_neurons, bus_width):
     input_wires = ['in{}'.format(i) for i in range(num_neurons)]
     output_wires = ['out{}'.format(i) for i in range(num_neurons)]
@@ -35,4 +39,7 @@ def generate_layer_code(num_neurons, bus_width):
     code += 'endmodule\n'
     return code
 
-print(generate_layer_code(5, 8))
+
+with open(sys.argv[1], 'w') as verilog_file:
+    verilog_file.write(generate_layer_code(int(sys.argv[2]), int(sys.argv[3])))
+
