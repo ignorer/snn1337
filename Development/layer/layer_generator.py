@@ -18,7 +18,7 @@ def generate_layer_code(num_inputs, num_outputs, bus_width):
     code += '\n'
 
     # ports definition
-    code += 'input wire clk;\n' + 'input wire rst;\n'
+    code += 'input wire clk;\ninput wire rst;\n'
     code += '\n'
 
     for i in range(num_inputs):
@@ -31,8 +31,7 @@ def generate_layer_code(num_inputs, num_outputs, bus_width):
 
     # neurons
     for i in range(num_outputs):
-        code += 'neuron{}in neuron{}'.format(num_inputs, i) + '('
-        code += '.clk(clk), .rst(rst), '
+        code += 'neuron{}in neuron{}(.clk(clk), .rst(rst), '.format(num_inputs, i)
         for j in range(num_inputs):
             code += '.in{}({}), '.format(j, input_wires[j])
         code += '.out(out{}));\n'.format(i)
@@ -41,7 +40,7 @@ def generate_layer_code(num_inputs, num_outputs, bus_width):
     code += 'endmodule\n'
     return code
 
-print(generate_layer_code(2, 2, 8))
+#print(generate_layer_code(2, 2, 8))
 
 #with open(sys.argv[1], 'w') as verilog_file:
 #    verilog_file.write(generate_layer_code(int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])))
