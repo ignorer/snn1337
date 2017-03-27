@@ -1,15 +1,14 @@
 #!/usr/bin/python
 
-import sys
+# import layer_generator
 
 
-# num_outputs is actually number of neurons in the layer
-def generate_layer_code(num_inputs, num_outputs, bus_width):
+def generate_network_code(num_inputs, num_outputs, layers_size, bus_width):
     input_wires = ['in{}'.format(i) for i in range(num_inputs)]
     output_wires = ['out{}'.format(i) for i in range(num_outputs)]
 
     # module declaration
-    code = 'module layer{}in{}out(clk, rst, '.format(num_inputs, num_outputs)
+    code = 'module network(clk, rst, '
     for i in range(num_inputs):
         code += input_wires[i] + ', '
     for i in range(num_outputs - 1):
@@ -29,19 +28,10 @@ def generate_layer_code(num_inputs, num_outputs, bus_width):
         code += 'output [{}:0] {};\n'.format(bus_width - 1, output_wires[i])
     code += '\n'
 
-    # neurons
-    for i in range(num_outputs):
-        code += 'neuron{}in neuron{}'.format(num_inputs, i) + '('
-        code += '.clk(clk), .rst(rst), '
-        for j in range(num_inputs):
-            code += '.in{}({}), '.format(j, input_wires[j])
-        code += '.out(out{}));\n'.format(i)
-    code += '\n'
+    # TODO
 
-    code += 'endmodule\n'
+    code += 'endmodule'
     return code
 
-print(generate_layer_code(2, 2, 8))
 
-#with open(sys.argv[1], 'w') as verilog_file:
-#    verilog_file.write(generate_layer_code(int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])))
+print(generate_network_code(2, 1, [2, 2], 8))
