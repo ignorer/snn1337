@@ -30,6 +30,7 @@ module spiking_neuron_2in(clk, rst, in1, in2, out);
   
   parameter NEURON_LEVEL = -1;
   parameter NEURON_ID = -1; // id inside level
+  parameter SILENT = 1;
   
   parameter INPUTS_COUNT = 2;
   
@@ -44,9 +45,6 @@ module spiking_neuron_2in(clk, rst, in1, in2, out);
   parameter COMPENSATION_WEIGHT = INT_MAX * INPUTS_COUNT; 
   parameter OUT_BARRIER = INT_MAX * 0.5; // fire if weighted sum is greater than it
   parameter DELIVERY_LENGTH = 1;
-      
-  //initial $display("Neuron(%d, %d) initialised, weights: [%d, %d]", 
-  //    NEURON_LEVEL, NEURON_ID, IN1_WEIGHT, IN2_WEIGHT);
   
   input wire clk;
   input wire rst;
@@ -108,7 +106,7 @@ module spiking_neuron_2in(clk, rst, in1, in2, out);
   
   always @(posedge rst)
   begin
-    $display("Start!!!");
+    if (!SILENT) $display("Start!!!");
     delivery_in <= 0;
     state_out <= STATE_NULL;
     state1 <= STATE_NULL;
@@ -119,7 +117,7 @@ module spiking_neuron_2in(clk, rst, in1, in2, out);
   // Relatively useless debug element
   always @(posedge clk)
   begin
-    $display("++++ New clk! ++++");
+    if (!SILENT) $display("++++ New clk! ++++");
   
     state_out = state_out < STATE_GOOD_MAX ? state_out + 1 : STATE_NULL;
     state1 = (in1 == 1) ? 0 : (state1 < STATE_GOOD_MAX ? state1 + 1 : STATE_NULL);
@@ -127,10 +125,10 @@ module spiking_neuron_2in(clk, rst, in1, in2, out);
     
     if (delivery_in != 0)
     begin
-      $display("Delay shoot...");
+      if (!SILENT) $display("Delay shoot...");
       if (delivery_in == 1)
         begin
-          $display("Fire!!!");
+          if (!SILENT) $display("Fire!!!");
           out = 1;
     	   end;
       delivery_in = delivery_in - 1;
@@ -143,10 +141,11 @@ module spiking_neuron_2in(clk, rst, in1, in2, out);
             + calc_time_weight(state1) * IN1_WEIGHT 
             + calc_time_weight(state2) * IN2_WEIGHT;
     
-      $display("State: raw_sum = -%3d*%3d + %3d*%3d + %3d*%3d", 
-         calc_time_weight(state_out), COMPENSATION_WEIGHT, 
-         calc_time_weight(state1), IN1_WEIGHT, 
-         calc_time_weight(state2), IN2_WEIGHT);
+      if (!SILENT) $display(
+          "State: raw_sum = -%3d*%3d + %3d*%3d + %3d*%3d", 
+          calc_time_weight(state_out), COMPENSATION_WEIGHT, 
+          calc_time_weight(state1), IN1_WEIGHT, 
+          calc_time_weight(state2), IN2_WEIGHT);
       
       is_negative = (sum[SIGN_MSB:SIGN_LSB] != 0);
       is_overflow = (sum[OVERFLOW_MSB:OVERFLOW_LSB] != 0);
@@ -154,11 +153,11 @@ module spiking_neuron_2in(clk, rst, in1, in2, out);
   
       sum = (is_negative ? 0 : (is_overflow ? INT_MAX : needed));
     
-      $display("State: st1=%d, st2=%d, st_out=%d, sum=%d", state1, state2, state_out, sum);
+      if (!SILENT) $display("State: st1=%d, st2=%d, st_out=%d, sum=%d", state1, state2, state_out, sum);
       
       if (sum > OUT_BARRIER)
       begin
-        $display("Shoot soon");
+        if (!SILENT) $display("Shoot soon");
         state_out = 0;  
         if (DELIVERY_LENGTH == 0)
           out = 1;
