@@ -9,6 +9,8 @@
 #include "../include/cl.hpp"
 #include "../include/err_code.h"
 
+using namespace std;
+
 void printError(cl::Error err) {
     std::cout << "Exception\n";
     std::cerr << "ERROR: " << err.what() << "(" << err_code(err.err()) << ")" << std::endl;
@@ -68,7 +70,7 @@ class Matrix {
   private:
     vector<vector<int>> matrix;
   public:
-    Matrix(int n, int m, bool random = true, vector<vector<int>> values = nullptr) {
+    Matrix(int n, int m) {
         srand(43);
         for (int i = 0; i < n; i++) {
             matrix.push_back(vector<int>(m));
