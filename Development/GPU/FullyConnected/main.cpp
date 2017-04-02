@@ -1,78 +1,13 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <string>
-#include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <iterator>
 
-class Layer{
-private:
-    std::vector<std::vector<double>> weights;
-    std::vector<double> biases;
-    int width;
-public:
-    Layer(int width, std::vector<std::vector<double>> weights, std::vector<double> biases) {
-        this->width = width;
-        for(int i = 0; i < this->width; i++) {
-            this->weights = weights;
-            this->biases = biases;
-        }
-    }
+#include <FullyConnectedNN.h>
 
-    const std::vector<std::vector<double>> &getWeights() const {
-        return weights;
-    }
-
-    const std::vector<double> &getBiases() const {
-        return biases;
-    }
-
-    int getWidth() const {
-        return width;
-    }
-
-
-    void setWeights(const std::vector<std::vector<double>> &weights) {
-        Layer::weights = weights;
-    }
-
-    void setBiases(const std::vector<double> &biases) {
-        Layer::biases = biases;
-    }
-
-    void setWidth(int width) {
-        Layer::width = width;
-    }
-};
-
-class FullyConnectedNN{
-private:
-    std::vector<Layer> layers;
-public:
-    FullyConnectedNN(std::vector<Layer> layers) {
-        this->layers = layers;
-    }
-
-    void printFullyConnectedNN() {
-        for (auto layer : layers) {
-            std::cout << layer.getWidth() << "\n";
-            for (int i = 0; i < layer.getWidth(); i++) {
-                for (int j = 0; j < layer.getWeights()[i].size(); j++) {
-                    std::cout << layer.getWeights()[i][j] << " ";
-                }
-                std::cout << "\n";
-            }
-            for (int i = 0; i < layer.getBiases().size(); i++) {
-                std::cout << layer.getBiases()[i] << " ";
-            }
-            std::cout << "\n";
-        }
-    }
-};
-
-FullyConnectedNN loadFullyConnectedNN(std::string filename) {
+FullyConnectedNN loadFullyConnectedNN(const std::string& filename) {
     std::ifstream in(filename);
 
     std::vector<Layer> layers;
@@ -102,5 +37,6 @@ FullyConnectedNN loadFullyConnectedNN(std::string filename) {
 }
 
 int main() {
-    FullyConnectedNN network = loadFullyConnectedNN("network_digits");
+    FullyConnectedNN network = loadFullyConnectedNN("network_xor");
+    network.printFullyConnectedNNEmptyValues();
 }
