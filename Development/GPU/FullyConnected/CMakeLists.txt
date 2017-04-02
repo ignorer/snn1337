@@ -8,4 +8,4 @@ add_executable(FullyConnected ${SOURCE_FILES})
 
 target_link_libraries(FullyConnected ${OpenCL_LIBRARY})
 
-#file(COPY kernel.cl DESTINATION .)
+file(COPY neuron.cl DESTINATION .)
