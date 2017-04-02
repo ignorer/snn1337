@@ -45,4 +45,4 @@ def generate_layer_code(bus_width, num_inputs, num_outputs):
 
 
 print(generate_layer_code(bus_width=8, num_inputs=2, num_outputs=2))
-#print(generate_layer_code(bus_width=8, weight_matrix=np.matrix([[2, 2, 3], [3, 2, 2]])))
+# print(generate_layer_code(bus_width=8, weight_matrix=np.matrix([[2, 2, 3], [3, 2, 2]])))

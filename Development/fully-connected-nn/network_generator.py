@@ -16,7 +16,7 @@ def generate_parameter_pass(weight_matrix):
 
 def generate_network_code(bus_width, weight_matrices):
     layers_size = [weight_matrices[i].shape[1] for i in range(len(weight_matrices))]
-    num_inputs = weight_matrices[0].shape[1]
+    num_inputs = weight_matrices[0].shape[0]
     num_outputs = layers_size[-1]
 
     # module declaration
@@ -81,5 +81,4 @@ def generate_network_code(bus_width, weight_matrices):
 
 
 print(generate_network_code(bus_width=8, weight_matrices=[np.matrix([[1, 2], [3, 4]]),
-                                                          np.matrix([[1, 2, 3], [5, 6, 7]]),
-                                                          np.matrix([[7], [8], [3]])]))
+                                                          np.matrix([[5], [6]])]))
