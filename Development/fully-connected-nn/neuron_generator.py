@@ -10,7 +10,6 @@ def neuron_generator(bus_width, num_inputs):
     source += 'out);\n\n'
 
     # parameters
-    source += 'parameter EXP = 2.72;\n'
     for i in range(num_inputs):
         source += f'parameter W{i} = 0;\n'
     source += '\n'
@@ -25,11 +24,10 @@ def neuron_generator(bus_width, num_inputs):
     source += f'output [{bus_width - 1}:0] out;\n\n'
 
     # neuron logic
-    sum_source = ''
+    source += 'assign out = '
     for i in range(num_inputs - 1):
-        sum_source += f'in{i} * W{i} + '
-    sum_source += f'in{num_inputs - 1} * W{num_inputs - 1}'
-    source += f'assign out = 1 / (1 + EXP ** -({sum_source}));\n\n'
+        source += f'in{i} * W{i} + '
+    source += f'in{num_inputs - 1} * W{num_inputs - 1};\n\n'
 
     source += 'endmodule\n'
 
