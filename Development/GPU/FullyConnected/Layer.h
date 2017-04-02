@@ -1,5 +1,4 @@
-#ifndef GPU_LAYER_H
-#define GPU_LAYER_H
+#pragma once
 
 #include <vector>
 
@@ -23,5 +22,3 @@ public:
 
     void setWidth(int width);
 };
-
-#endif //GPU_LAYER_H

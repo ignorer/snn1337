@@ -2,35 +2,35 @@
 #include <fstream>
 #include <vector>
 #include <sstream>
-#include <algorithm>
 #include <iterator>
 
-#include <FullyConnectedNN.h>
+#include "FullyConnectedNN.h"
+#include "Layer.h"
 
-FullyConnectedNN loadFullyConnectedNN(const std::string& filename) {
-    std::ifstream in(filename);
+using namespace std;
 
-    std::vector<Layer> layers;
+FullyConnectedNN loadFullyConnectedNN(const string& filename) {
+    ifstream in(filename);
 
-    std::string strWidth;
+    vector<Layer> layers;
+
+    string strWidth;
     while (getline(in, strWidth)) {
-        std::istringstream inWidth(strWidth);
+        istringstream inWidth(strWidth);
         int width;
         inWidth >> width;
-        std::string strWeights;
-        std::vector<std::vector<double>> weights;
+        string strWeights;
+        vector<vector<double>> weights;
         for (int i = 0; i < width; i++) {
             getline(in, strWeights);
-            std::istringstream iss(strWeights);
-            std::vector<double> neuronWeights{std::istream_iterator<double>{iss},
-                                  std::istream_iterator<double>{}};
+            istringstream iss(strWeights);
+            vector<double> neuronWeights{istream_iterator<double>{iss}, istream_iterator<double>{}};
             weights.push_back(neuronWeights);
         }
-        std::string strBiases;
+        string strBiases;
         getline(in, strBiases);
-        std::istringstream iss(strBiases);
-        std::vector<double> biases{std::istream_iterator<double>{iss},
-                                    std::istream_iterator<double>{}};
+        istringstream iss(strBiases);
+        vector<double> biases{istream_iterator<double>{iss}, istream_iterator<double>{}};
         layers.push_back(Layer(width, weights, biases));
     }
     return FullyConnectedNN(layers);
@@ -38,5 +38,5 @@ FullyConnectedNN loadFullyConnectedNN(const std::string& filename) {
 
 int main() {
     FullyConnectedNN network = loadFullyConnectedNN("network_xor");
-    network.printFullyConnectedNNEmptyValues();
+    network.printEmptyValues();
 }

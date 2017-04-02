@@ -1,59 +1,58 @@
 #include <iterator>
-#include <algorithm>
-#include <sstream>
 #include <vector>
-#include <fstream>
 #include <iostream>
 
 #include "FullyConnectedNN.h"
 #include "Layer.h"
 
-FullyConnectedNN::FullyConnectedNN(const std::vector<Layer>& layers) : layers(layers){
+using namespace std;
+
+FullyConnectedNN::FullyConnectedNN(const vector<Layer>& layers) : layers(layers){
 }
 
-void FullyConnectedNN::printFullyConnectedNN() {
+void FullyConnectedNN::print() {
     for (auto& layer : layers) {
-        std::cout << layer.getWidth() << "\n";
+        cout << layer.getWidth() << "\n";
         for (int i = 0; i < layer.getWidth(); i++) {
             for (int j = 0; j < layer.getWeights()[i].size(); j++) {
-                std::cout << layer.getWeights()[i][j] << " ";
+                cout << layer.getWeights()[i][j] << " ";
             }
-            std::cout << "\n";
+            cout << "\n";
         }
         for (int i = 0; i < layer.getBiases().size(); i++) {
-            std::cout << layer.getBiases()[i] << " ";
+            cout << layer.getBiases()[i] << " ";
         }
-        std::cout << "\n";
+        cout << "\n";
     }
 }
 
-void FullyConnectedNN::printFullyConnectedNNAllWeights() {
-    std::vector<double> allWeights = getAllWeights();
+void FullyConnectedNN::printAllWeights() {
+    vector<double> allWeights = getAllWeights();
     for (auto& weight : allWeights) {
-        std::cout << weight << " ";
+        cout << weight << " ";
     }
 }
 
-void FullyConnectedNN::printFullyConnectedNNEmptyValues() {
-    std::vector<double> emptyValues = getEmptyValues();
+void FullyConnectedNN::printEmptyValues() {
+    vector<double> emptyValues = getEmptyValues();
     for (auto& value : emptyValues) {
-        std::cout << value << " ";
+        cout << value << " ";
     }
 }
 
-std::vector<int> FullyConnectedNN::getSizes() {
-    std::vector<int> sizes(layers.size());
+vector<int> FullyConnectedNN::getSizes() {
+    vector<int> sizes(layers.size());
     for (auto& layer : layers) {
         sizes.push_back(layer.getWidth());
     }
     return sizes;
 }
 
-std::vector<double> FullyConnectedNN::getAllWeights() {
-    std::vector<double> allWeights;
+vector<double> FullyConnectedNN::getAllWeights() {
+    vector<double> allWeights;
     for (auto& layer : layers) {
-        int inLayerSize = 0;
-        int outLayerSize = layer.getWeights().size();
+        size_t inLayerSize = 0;
+        size_t outLayerSize = layer.getWeights().size();
         if (outLayerSize != 0) {
            inLayerSize = layer.getWeights()[0].size();
         }
@@ -67,8 +66,8 @@ std::vector<double> FullyConnectedNN::getAllWeights() {
     return allWeights;
 }
 
-std::vector<double> FullyConnectedNN::getEmptyValues() {
-    std::vector<double> values;
+vector<double> FullyConnectedNN::getEmptyValues() {
+    vector<double> values;
     for (int i = 0; i < layers.size(); i++) {
         if (i != layers.size() - 1) {
             values.push_back(1);

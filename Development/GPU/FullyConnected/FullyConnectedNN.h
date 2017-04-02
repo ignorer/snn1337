@@ -1,7 +1,8 @@
-#ifndef GPU_FULLYCONNECTEDNN_H
-#define GPU_FULLYCONNECTEDNN_H
+#pragma once
 
-#include "Layer.h"
+#include <vector>
+
+class Layer;
 
 class FullyConnectedNN {
 private:
@@ -9,11 +10,11 @@ private:
 public:
     FullyConnectedNN(const std::vector<Layer>& layers);
 
-    void printFullyConnectedNN();
+    void print();
 
-    void printFullyConnectedNNAllWeights();
+    void printAllWeights();
 
-    void printFullyConnectedNNEmptyValues();
+    void printEmptyValues();
 
     std::vector<int> getSizes();
 
@@ -21,5 +22,3 @@ public:
 
     std::vector<double> getEmptyValues();
 };
-
-#endif //GPU_FULLYCONNECTEDNN_H
