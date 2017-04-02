@@ -14,7 +14,7 @@ def generate_layer_code(bus_width, num_inputs, num_outputs):
     # parameters
     for i in range(num_inputs):
         for j in range(num_outputs):
-            source += f'parameter W{i}TO{j};\n'
+            source += f'parameter W{i}TO{j} = 0;\n'
     source += '\n'
 
     # ports definition

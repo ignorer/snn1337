@@ -10,7 +10,7 @@ def neuron_generator(bus_width, num_inputs):
 
     # parameters
     for i in range(num_inputs):
-        source += f'parameter W{i};\n'
+        source += f'parameter W{i} = 0;\n'
     source += '\n'
 
     # ports definition
