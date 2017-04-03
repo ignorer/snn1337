@@ -2,7 +2,7 @@ class FCNNGenerator:
     def __init__(self, bus_width=8):
         self.bus_width = bus_width
 
-    def generate_layer_code(self, num_inputs, num_outputs):
+    def generate_layer_module(self, num_inputs, num_outputs):
         # module declaration
         source = f'module layer{num_inputs}in{num_outputs}out(clk, rst, '
         for i in range(num_inputs):
@@ -54,7 +54,7 @@ class FCNNGenerator:
                     source += f'.W{x}TO{y}({weight_matrix[x, y]}), '
         return source
 
-    def generate_network_code(self, weight_matrices):
+    def generate_network_module(self, weight_matrices):
         layers_size = [weight_matrices[i].shape[1] for i in range(len(weight_matrices))]
         num_inputs = weight_matrices[0].shape[0]
         num_outputs = layers_size[-1]
@@ -119,7 +119,7 @@ class FCNNGenerator:
         source += 'endmodule\n'
         return source
 
-    def generate_neuron_code(self, num_inputs):
+    def generate_neuron_module(self, num_inputs):
         # module declaration
         source = f'module neuron{num_inputs}in(clk, rst, '
         for i in range(num_inputs):
@@ -159,7 +159,3 @@ class FCNNGenerator:
         source += 'endmodule\n'
 
         return source
-
-
-generator = FCNNGenerator(bus_width=8)
-print(generator.generate_neuron_code(num_inputs=12))
