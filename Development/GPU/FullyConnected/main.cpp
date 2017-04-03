@@ -3,10 +3,48 @@
 #include <fstream>
 #include <vector>
 #include <sstream>
-#include <algorithm>
 #include <iterator>
+#include <algorithm>
 
 #include <cl.hpp>
+
+#include "FullyConnectedNN.h"
+#include "Layer.h"
+
+using namespace std;
+
+FullyConnectedNN loadFullyConnectedNN(const string& filename) {
+    ifstream in(filename);
+
+    vector<Layer> layers;
+
+    string strWidth;
+    while (getline(in, strWidth)) {
+        istringstream inWidth(strWidth);
+        int width;
+        inWidth >> width;
+        string strWeights;
+        vector<vector<double>> weights;
+        for (int i = 0; i < width; i++) {
+            getline(in, strWeights);
+            istringstream iss(strWeights);
+            vector<double> neuronWeights{istream_iterator<double>{iss}, istream_iterator<double>{}};
+            weights.push_back(neuronWeights);
+        }
+        string strBiases;
+        getline(in, strBiases);
+        istringstream iss(strBiases);
+        vector<double> biases{istream_iterator<double>{iss}, istream_iterator<double>{}};
+        layers.push_back(Layer(width, weights, biases));
+    }
+    return FullyConnectedNN(layers);
+}
+
+    // the example of usage of Olga's classes for NN initialization
+//int main() {
+//    FullyConnectedNN network = loadFullyConnectedNN("network_xor");
+//    network.printEmptyValues();
+//}
 
 class clStruct{
 private:
@@ -121,22 +159,20 @@ void loopFunction(clStruct clStructVariables,std::vector<float>& values, std::ve
     clStructVariables.getQueue().enqueueReadBuffer(outputBuffer, CL_TRUE, 0, output.size() * sizeof(float), output.data());
 }
 
-
-
 int main() {
-
     std::vector<int> layerSizes;
-	std::vector<float> weights;
-	std::vector<float> values;
+    std::vector<float> weights;
+    std::vector<float> values;
     std::vector<float> biases;
-	std::vector<float> input;
-	std::vector<float> output;
+    std::vector<float> input;
+    std::vector<float> output;
     std::vector<int> counters;
+  
     counters = layerSizes;
-	std::string kernelFileName = "neuron.cl";
+    std::string kernelFileName = "neuron.cl";
     char array[] = "neuron";
     const char* functionName = array;
-	clStruct clStructValues = mainFunction( kernelFileName, layerSizes, weights, functionName, counters);
+    clStruct clStructValues = mainFunction( kernelFileName, layerSizes, weights, functionName, counters);
     loopFunction(clStructValues,  values, input, output);
     return 0;
 }
