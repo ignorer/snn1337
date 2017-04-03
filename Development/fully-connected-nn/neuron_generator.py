@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 
-def neuron_generator(bus_width, num_inputs):
+def generate_neuron_code(bus_width, num_inputs):
 
     # module declaration
     source = f'module neuron{num_inputs}in(clk, rst, '
@@ -44,4 +44,4 @@ def neuron_generator(bus_width, num_inputs):
     return source
 
 
-print(neuron_generator(bus_width=8, num_inputs=16))
+print(generate_neuron_code(bus_width=8, num_inputs=16))
