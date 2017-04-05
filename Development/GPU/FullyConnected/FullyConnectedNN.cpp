@@ -27,21 +27,21 @@ void FullyConnectedNN::print() {
 }
 
 void FullyConnectedNN::printAllWeights() {
-    vector<double> allWeights = getAllWeights();
+    vector<float> allWeights = getAllWeights();
     for (auto& weight : allWeights) {
         cout << weight << " ";
     }
 }
 
 void FullyConnectedNN::printEmptyValues() {
-    vector<double> emptyValues = getEmptyValues();
+    vector<float> emptyValues = getEmptyValues();
     for (auto& value : emptyValues) {
         cout << value << " ";
     }
 }
 
-vector<int> FullyConnectedNN::getSizes() {
-    vector<int> sizes(layers.size());
+vector<size_t> FullyConnectedNN::getSizes() {
+    vector<size_t> sizes(layers.size());
     for (auto& layer : layers) {
         sizes.push_back(layer.getWidth());
     }
