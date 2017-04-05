@@ -18,7 +18,7 @@ public:
 
     std::vector<int> getSizes();
 
-    std::vector<double> getAllWeights();
+    std::vector<float> getAllWeights();
 
-    std::vector<double> getEmptyValues();
+    std::vector<float> getEmptyValues();
 };

@@ -48,8 +48,8 @@ vector<int> FullyConnectedNN::getSizes() {
     return sizes;
 }
 
-vector<double> FullyConnectedNN::getAllWeights() {
-    vector<double> allWeights;
+vector<float> FullyConnectedNN::getAllWeights() {
+    vector<float> allWeights;
     for (auto& layer : layers) {
         size_t inLayerSize = 0;
         size_t outLayerSize = layer.getWeights().size();
@@ -66,8 +66,8 @@ vector<double> FullyConnectedNN::getAllWeights() {
     return allWeights;
 }
 
-vector<double> FullyConnectedNN::getEmptyValues() {
-    vector<double> values;
+vector<float> FullyConnectedNN::getEmptyValues() {
+    vector<float> values;
     for (int i = 0; i < layers.size(); i++) {
         if (i != layers.size() - 1) {
             values.push_back(1);
