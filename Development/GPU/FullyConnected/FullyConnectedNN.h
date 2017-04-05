@@ -21,4 +21,8 @@ public:
     std::vector<float> getAllWeights();
 
     std::vector<float> getEmptyValues();
+
+    std::vector<std::vector<float>> getInput(std::string filename);
+
+    std::vector<std::vector<float>> getOutput(std::string filename);
 };

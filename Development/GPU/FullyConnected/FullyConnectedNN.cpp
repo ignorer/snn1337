@@ -1,6 +1,9 @@
 #include <iterator>
 #include <vector>
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <stdexcept>
 
 #include "FullyConnectedNN.h"
 #include "Layer.h"
@@ -78,3 +81,40 @@ vector<float> FullyConnectedNN::getEmptyValues() {
     }
     return values;
 }
+
+vector<vector<float>> FullyConnectedNN::getInput(string filename) {
+    ifstream in(filename);
+
+    vector<vector<float>> input;
+
+    string strOneInput;
+    while (getline(in, strOneInput)) {
+        istringstream iss(strOneInput);
+        vector<float> oneInput{istream_iterator<float>{iss}, istream_iterator<float>{}};
+        if (oneInput.size() != layers[0].getWidth()) {
+            throw logic_error("Input shape does not match Input layer shape");
+        }
+        input.push_back(oneInput);
+    }
+
+    return input;
+}
+
+vector<vector<float>> FullyConnectedNN::getOutput(string filename) {
+    ifstream in(filename);
+
+    vector<vector<float>> output;
+
+    string strOneOutput;
+    while (getline(in, strOneOutput)) {
+        istringstream iss(strOneOutput);
+        vector<float> oneOutput{istream_iterator<float>{iss}, istream_iterator<float>{}};
+        if (oneOutput.size() != layers[layers.size() - 1].getWidth()) {
+            throw logic_error("Output shape does not match Output layer shape");
+        }
+        output.push_back(oneOutput);
+    }
+
+    return output;
+}
+
