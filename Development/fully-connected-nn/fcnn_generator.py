@@ -1,8 +1,15 @@
+import numpy as np
+
 class FCNNGenerator:
-    def __init__(self, bus_width=8):
+    neurons = dict()
+    layers = dict()
+
+    def __init__(self, bus_width=32):
         self.bus_width = bus_width
 
     def generate_layer_module(self, num_inputs, num_outputs):
+        if ((num_inputs, num_outputs) in self.layers):
+            return self.layers[(num_inputs, num_outputs)]
         # module declaration
         source = f'module layer{num_inputs}in{num_outputs}out(clk, rst, '
         for i in range(num_inputs):
@@ -30,6 +37,7 @@ class FCNNGenerator:
 
         # neurons
         for i in range(num_outputs):
+            self.generate_neuron_module(num_inputs)
             source += f'neuron{num_inputs}in #('
             for j in range(num_inputs - 1):
                 source += f'.W{j}(W{j}TO{i}), '
@@ -40,8 +48,9 @@ class FCNNGenerator:
             source += f'.out(out{i}));\n'
         source += '\n'
 
-        source += 'endmodule\n'
-        return source
+        source += 'endmodule\n\n'
+        self.layers[(num_inputs, num_outputs)] = source
+        return self.layers[(num_inputs, num_outputs)]
 
     @staticmethod
     def generate_parameter_pass(weight_matrix):
@@ -84,6 +93,7 @@ class FCNNGenerator:
         source += '\n'
 
         # input layer
+        self.generate_layer_module(num_inputs, layers_size[0])
         source += f'layer{num_inputs}in{layers_size[0]}out '
 
         source += self.generate_parameter_pass(weight_matrices[0])
@@ -96,6 +106,7 @@ class FCNNGenerator:
 
         # hidden layers
         for i in range(1, len(layers_size) - 1):
+            self.generate_layer_module(layers_size[i - 1], layers_size[i])
             source += f'layer{layers_size[i - 1]}in{layers_size[i]}out '
             source += self.generate_parameter_pass(weight_matrices[i])
             source += f'layer{i}(.clk(clk), .rst(rst), '
@@ -107,6 +118,7 @@ class FCNNGenerator:
 
         # output layer
         i = len(layers_size) - 1
+        self.generate_layer_module(layers_size[i - 1], layers_size[i])
         source += f'layer{layers_size[i - 1]}in{layers_size[i]}out '
         source += self.generate_parameter_pass(weight_matrices[-1])
         source += f'layer{i}(.clk(clk), .rst(rst), '
@@ -117,9 +129,17 @@ class FCNNGenerator:
         source += f'.out{num_outputs - 1}(out{num_outputs - 1}));\n\n'
 
         source += 'endmodule\n'
-        return source
+
+        depends = ""
+        for neuron in self.neurons.values():
+            depends += neuron
+        for layer in self.layers.values():
+            depends += layer
+        return depends + source
 
     def generate_neuron_module(self, num_inputs, extended_width=32):
+        if (num_inputs in self.neurons):
+            return self.neurons[num_inputs]
         # module declaration
         source = f'module neuron{num_inputs}in(clk, rst, '
         for i in range(num_inputs):
@@ -151,12 +171,28 @@ class FCNNGenerator:
         source += f'in{num_inputs - 1} * W{num_inputs - 1};\n'
         source += '    abs_x = x < 0 ? -x : x;\n'
         source += '    if (abs_x >= 5000) y = 1000;\n'
-        source += '    else if (abs_x >= 2375 && abs_x < 5000) y = 31 * abs_x + 843;\n'
-        source += '    else if (abs_x >= 1000 && abs_x < 2375) y = 125 * abs_x + 625;\n'
-        source += '    else if (abs_x >= 0 && abs_x < 1000) y = 250 * abs_x + 500;\n'
-        source += '    out = y / 1000;\n'
+        source += '    else if (abs_x >= 2375 && abs_x < 5000) y = 31 * abs_x / 1000 + 843;\n'
+        source += '    else if (abs_x >= 1000 && abs_x < 2375) y = 125 * abs_x / 1000 + 625;\n'
+        source += '    else if (abs_x >= 0 && abs_x < 1000) y = 250 * abs_x / 1000 + 500;\n'
+        source += '    out = y;\n'
         source += 'end\n\n'
+        source += 'endmodule\n\n'
+        self.neurons[num_inputs] = source
+        return self.neurons[num_inputs]
 
-        source += 'endmodule\n'
-
-        return source
+if __name__ == '__main__':
+    generator = FCNNGenerator()
+    weights = [
+        np.matrix(np.array([
+            1, 2,
+            3, 4,
+        ]).reshape(2, 2)),
+        np.matrix(np.array([
+            5, 6,
+            7, 8,
+        ]).reshape(2, 2)),
+        np.matrix(np.array([
+            9, 10
+        ]).reshape((2, 1)))
+    ]
+    print(generator.generate_network_module(weights))
