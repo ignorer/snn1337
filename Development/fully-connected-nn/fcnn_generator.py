@@ -1,11 +1,12 @@
 import numpy as np
 
 class FCNNGenerator:
-    neurons = dict()
-    layers = dict()
-
-    def __init__(self, bus_width=32):
+    def __init__(self, bus_width=16, decimal_precision=3):
         self.bus_width = bus_width
+        self.extended_width = bus_width * 2
+        self.decimal_precision = decimal_precision
+        self.neurons = dict()
+        self.layers = dict()
 
     def generate_layer_module(self, num_inputs, num_outputs):
         if ((num_inputs, num_outputs) in self.layers):
@@ -35,9 +36,9 @@ class FCNNGenerator:
             source += f'output [{self.bus_width - 1}:0] out{i};\n'
         source += '\n'
 
+        self.generate_neuron_module(num_inputs)
         # neurons
         for i in range(num_outputs):
-            self.generate_neuron_module(num_inputs)
             source += f'neuron{num_inputs}in #('
             for j in range(num_inputs - 1):
                 source += f'.W{j}(W{j}TO{i}), '
@@ -101,8 +102,18 @@ class FCNNGenerator:
         for i in range(num_inputs):
             source += f'.in{i}(in{i}), '
         for i in range(layers_size[0] - 1):
-            source += f'.out{i}(con0[{i}]), '
-        source += f'.out{layers_size[0] - 1}(con0[{layers_size[0] - 1}]));\n'
+            source += f'.out{i}('
+            if len(layers_size) > 1:
+                source += f'con0[{i}]'
+            else:
+                source += f'out{i}'
+            source += '), '
+        source += f'.out{layers_size[0] - 1}('
+        if len(layers_size) > 1:
+            source += f'con0[{layers_size[0] - 1}]'
+        else:
+            source += f'out{layers_size[0] - 1}'
+        source += '));\n'
 
         # hidden layers
         for i in range(1, len(layers_size) - 1):
@@ -117,16 +128,17 @@ class FCNNGenerator:
             source += f'.out{layers_size[i] - 1}(con{i}[{layers_size[i] - 1}]));\n'
 
         # output layer
-        i = len(layers_size) - 1
-        self.generate_layer_module(layers_size[i - 1], layers_size[i])
-        source += f'layer{layers_size[i - 1]}in{layers_size[i]}out '
-        source += self.generate_parameter_pass(weight_matrices[-1])
-        source += f'layer{i}(.clk(clk), .rst(rst), '
-        for j in range(layers_size[i - 1]):
-            source += f'.in{j}(con{i - 1}[{j}]), '
-        for j in range(num_outputs - 1):
-            source += f'.out{j}(.out{j}), '
-        source += f'.out{num_outputs - 1}(out{num_outputs - 1}));\n\n'
+        if len(layers_size) > 1:
+            i = len(layers_size) - 1
+            self.generate_layer_module(layers_size[i - 1], layers_size[i])
+            source += f'layer{layers_size[i - 1]}in{layers_size[i]}out '
+            source += self.generate_parameter_pass(weight_matrices[-1])
+            source += f'layer{i}(.clk(clk), .rst(rst), '
+            for j in range(layers_size[i - 1]):
+                source += f'.in{j}(con{i - 1}[{j}]), '
+            for j in range(num_outputs - 1):
+                source += f'.out{j}(out{j}), '
+            source += f'.out{num_outputs - 1}(out{num_outputs - 1}));\n\n'
 
         source += 'endmodule\n'
 
@@ -137,7 +149,10 @@ class FCNNGenerator:
             depends += layer
         return depends + source
 
-    def generate_neuron_module(self, num_inputs, extended_width=32):
+    def get_decimal(self, num):
+        return int(num * (10 ** self.decimal_precision) + 0.5)
+
+    def generate_neuron_module(self, num_inputs):
         if (num_inputs in self.neurons):
             return self.neurons[num_inputs]
         # module declaration
@@ -155,25 +170,25 @@ class FCNNGenerator:
         source += 'input wire clk;\ninput wire rst;\n\n'
 
         for i in range(num_inputs):
-            source += f'input [{self.bus_width - 1}:0] in{i};\n'
+            source += f'input signed [{self.bus_width - 1}:0] in{i};\n'
         source += '\n'
 
         source += f'output reg [{self.bus_width - 1}:0] out;\n\n'
 
         # neuron logic
-        source += f'reg signed [{extended_width - 1}:0] x;\n'
-        source += f'reg [{extended_width - 1}:0] abs_x;\n'
-        source += f'reg [{extended_width - 1}:0] y;\n'
+        source += f'reg signed [{self.extended_width - 1}:0] x;\n'
+        source += f'reg [{self.extended_width - 1}:0] abs_x;\n'
+        source += f'reg [{self.extended_width - 1}:0] y;\n'
         source += 'always @* begin\n'
         source += '    x = '
         for i in range(num_inputs - 1):
-            source += f'in{i} * W{i} + '
-        source += f'in{num_inputs - 1} * W{num_inputs - 1};\n'
+            source += f'in{i} * W{i} / {self.get_decimal(1)} + '
+        source += f'in{num_inputs - 1} * W{num_inputs - 1} / {self.get_decimal(1)};\n'
         source += '    abs_x = x < 0 ? -x : x;\n'
-        source += '    if (abs_x >= 5000) y = 1000;\n'
-        source += '    else if (abs_x >= 2375 && abs_x < 5000) y = 31 * abs_x / 1000 + 843;\n'
-        source += '    else if (abs_x >= 1000 && abs_x < 2375) y = 125 * abs_x / 1000 + 625;\n'
-        source += '    else if (abs_x >= 0 && abs_x < 1000) y = 250 * abs_x / 1000 + 500;\n'
+        source += f'    if (abs_x >= {self.get_decimal(5)}) y = {self.get_decimal(1)};\n'
+        source += f'    else if (abs_x >= {self.get_decimal(2.375)}) y = {self.get_decimal(0.03125)} * abs_x / {self.get_decimal(1)} + {self.get_decimal(0.84375)};\n'
+        source += f'    else if (abs_x >= {self.get_decimal(1)}) y = {self.get_decimal(0.125)} * abs_x / {self.get_decimal(1)} + {self.get_decimal(0.625)};\n'
+        source += f'    else if (abs_x >= 0) y = {self.get_decimal(0.25)} * abs_x / {self.get_decimal(1)} + {self.get_decimal(0.5)};\n'
         source += '    out = y;\n'
         source += 'end\n\n'
         source += 'endmodule\n\n'
