@@ -6,6 +6,7 @@
 #include <iterator>
 #include <algorithm>
 #include <numeric>
+#include <chrono>
 
 #define __CL_ENABLE_EXCEPTIONS
 #include <cl.hpp>
@@ -77,15 +78,11 @@ void processSignleInput(ClStructHolder& holder, vector<int>& layers, vector<floa
     cl::CommandQueue queue = holder.getQueue();
     cl::Kernel kernel = holder.getKernel();
 
-    cl::Buffer layersBuffer(context, layers.begin(), layers.end(), true);
-    cl::Buffer weightsBuffer(context, weights.begin(), weights.end(), true);
-    cl::Buffer valuesBuffer(context, values.begin(), values.end(), false);
+    cl::Buffer countersBuffer(context, counters.begin(), counters.end(), true);
+    cl::Buffer valuesBuffer(context, values.begin(), values.end(), true);
     cl::Buffer inputBuffer(context, input.begin(), input.end(), true);
     cl::Buffer outputBuffer(context, output.begin(), output.end(), false);
-    cl::Buffer countersBuffer(context, counters.begin(), counters.end(), false);
 
-    kernel.setArg(0, layersBuffer);
-    kernel.setArg(1, weightsBuffer);
     kernel.setArg(2, countersBuffer);
     kernel.setArg(3, valuesBuffer);
     kernel.setArg(4, inputBuffer);
@@ -107,20 +104,33 @@ void testXor() {
     vector<float> weights = network.getAllWeights();
     vector<float> values = network.getEmptyValues();
     vector<vector<float>> inputs = {{0, 0}, {0, 1}, {1, 0}, {1, 1}};
-    vector<vector<float>> expectedOutputs = {{-1.71589994}, {1.71589994}, {1.71589994}, {-1.71589994}};
+    vector<vector<float>> expectedOutputs = {{0}, {1}, {1}, {0}};
     vector<int> counters(layerSizes.begin(), layerSizes.end());
     counters[0] = 0;
 
     try {
-        ClStructHolder clStructValues = buildClHolder("neuron.cl", layerSizes, weights, "neuron");
-        for (size_t i = 0; i < inputs.size(); ++i) {
+        ClStructHolder holder = buildClHolder("neuron.cl", layerSizes, weights, "neuron");
+        cl::Buffer layersBuffer(holder.getContext(), layerSizes.begin(), layerSizes.end(), true);
+        cl::Buffer weightsBuffer(holder.getContext(), weights.begin(), weights.end(), true);
+        holder.getKernel().setArg(0, layersBuffer);
+        holder.getKernel().setArg(1, weightsBuffer);
+
+        auto start = chrono::steady_clock::now();
+        for (size_t i = 0; i < inputs.size() * 1000; ++i) {
             vector<float> input;
             input.push_back(1);
-            input.insert(input.end(), inputs[i].begin(), inputs[i].end());
+            input.insert(input.end(), inputs[i % inputs.size()].begin(), inputs[i % inputs.size()].end());
             vector<float> predictedOutput(layerSizes.back());
-            processSignleInput(clStructValues, layerSizes, weights, values, input, predictedOutput, counters);
-            cout << i << ": " << (predictedOutput == expectedOutputs[i] ? "correct" : "wrong") << endl;
+            processSignleInput(holder, layerSizes, weights, values, input, predictedOutput, counters);
+
+            bool isOutputCorrect = true;
+            for (int j = 0; j < predictedOutput.size(); ++j) {
+                isOutputCorrect = isOutputCorrect && (predictedOutput[j] - expectedOutputs[i % inputs.size()][j]) < 1e-5;
+            }
+//            cout << i << ": " << (isOutputCorrect ? "correct" : "wrong") << endl;
         }
+        cout << chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start).count() << endl;
+
     } catch (const cl::Error& e) {
         cerr << errCode(e.err()) << endl;
     } catch (const exception& e) {

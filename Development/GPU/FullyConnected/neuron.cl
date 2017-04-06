@@ -8,8 +8,12 @@ inline float dotProduct(__global const float* a,  __global const float* b, size_
     return res;
 }
 
-inline float sigmoid(float x) {
+float activationFunction(float x) {
     return 1.7159*tanh(0.66666667*x);
+}
+
+float sigmoid(float x) {
+    return 1 / (1 + exp(-x));
 }
 
 int calculateLayerId(__global const int* layerSizes, int globalId) {
@@ -89,7 +93,8 @@ __kernel void neuron(
     }
 
     float resultValue = dotProduct(weightsVector, valuesVector, layerSizes[layerId - 1] + 1);
-    *calculateTargetValuePtr(values, outputs, valuesNumber, layersNumber, layerId, globalId) = sigmoid(resultValue);
+    *calculateTargetValuePtr(values, outputs, valuesNumber, layersNumber, layerId, globalId) =
+            layerId < layersNumber - 1 ? activationFunction(resultValue) : sigmoid(resultValue);
 
     atomic_dec(counters + layerId);
 }
