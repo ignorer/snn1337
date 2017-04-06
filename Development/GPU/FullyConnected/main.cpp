@@ -5,9 +5,11 @@
 #include <sstream>
 #include <iterator>
 #include <algorithm>
-
-#include <cl.hpp>
 #include <numeric>
+
+#define __CL_ENABLE_EXCEPTIONS
+#include <cl.hpp>
+#include <errCode.h>
 
 #include "FullyConnectedNN.h"
 #include "Layer.h"
@@ -42,93 +44,91 @@ FullyConnectedNN loadFullyConnectedNN(const string& filename) {
     return FullyConnectedNN(layers);
 }
 
-ClStructHolder buildClHolder(string kernelFileName, vector<size_t>& layerSizes, vector<float>& weights,
-        const char* functionName, vector<int>& counters) {
-    vector<cl::Platform> allPlatforms;
-    cl::Platform::get(&allPlatforms);
-    if (allPlatforms.size() == 0) {
-        cout << " No platforms found. Check OpenCL installation!\n";
-        exit(1);
-    }
-
-    cl::Platform defaultPlatform = allPlatforms[0];
-    vector<cl::Device> allDevices;
-    defaultPlatform.getDevices(CL_DEVICE_TYPE_ALL, &allDevices);
-    if (allDevices.size() == 0) {
-        cout << " No devices found. Check OpenCL installation!\n";
-        exit(1);
-    }
-    cl::Device defaultDevice = allDevices[0];
+ClStructHolder buildClHolder(string kernelFileName, const vector<int>& layerSizes, const vector<float>& weights,
+        const char* functionName) {
+    cl::Device defaultDevice = cl::Device::getDefault();
     cl::Context context(defaultDevice);
+    cl::CommandQueue queue(context, defaultDevice);
 
     ifstream sourceFile(kernelFileName);
     string sourceCode(istreambuf_iterator<char>(sourceFile), (istreambuf_iterator<char>()));
     cl::Program::Sources source(1, make_pair(sourceCode.c_str(), sourceCode.length() + 1));;
     cl::Program program = cl::Program(context, source);
-    if (program.build({defaultDevice}) != CL_SUCCESS) {
-        cout << " Error building: " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(defaultDevice) << "\n";
-        getchar();
-        exit(1);
+
+    try {
+        program.build({defaultDevice});
     }
-
-    cl::Buffer layerSizesBuffer(context, CL_MEM_READ_WRITE, layerSizes.size() * sizeof(int));
-    cl::Buffer weightsBuffer(context, CL_MEM_READ_WRITE, weights.size() * sizeof(float));
-    cl::Buffer countersBuffer(context, CL_MEM_READ_WRITE, counters.size() * sizeof(int));
-
-    cl::CommandQueue queue(context, defaultDevice);
-    queue.enqueueWriteBuffer(layerSizesBuffer, CL_TRUE, 0, layerSizes.size() * sizeof(int), layerSizes.data());
-    queue.enqueueWriteBuffer(weightsBuffer, CL_TRUE, 0, weights.size() * sizeof(float), weights.data());
-    queue.enqueueWriteBuffer(countersBuffer, CL_TRUE, 0, counters.size() * sizeof(int), counters.data());
+    catch (cl::Error& error) {
+        string buildLog;
+        program.getBuildInfo(defaultDevice, CL_PROGRAM_BUILD_LOG, &buildLog);
+        throw runtime_error(buildLog);
+    }
 
     cl::Kernel kernel(program, functionName);
 
-    kernel.setArg(1, layerSizesBuffer);
-    kernel.setArg(2, weightsBuffer);
-    kernel.setArg(6, countersBuffer);
+    size_t threadNumber = accumulate(layerSizes.begin() + 1, layerSizes.end(), 0ul);
 
-    size_t threadNumber = accumulate(layerSizes.begin(), layerSizes.end(), 0ul);
-    size_t groupSize = *max_element(layerSizes.begin(), layerSizes.end());
-
-    return ClStructHolder(context, queue, kernel, threadNumber, groupSize);
+    return ClStructHolder(context, queue, kernel, threadNumber);
 }
 
-void loopFunction(ClStructHolder holder, vector<float>& values, vector<float>& input, vector<float>& output) {
+void processSignleInput(ClStructHolder& holder, vector<int>& layers, vector<float> weights, vector<float>& values,
+        vector<float>& input, vector<float>& output, vector<int>& counters) {
     cl::Context context = holder.getContext();
     cl::CommandQueue queue = holder.getQueue();
     cl::Kernel kernel = holder.getKernel();
 
-    cl::Buffer valuesBuffer(context, CL_MEM_READ_WRITE, values.size() * sizeof(float));
-    cl::Buffer inputBuffer(context, CL_MEM_READ_WRITE, input.size() * sizeof(float));
-    cl::Buffer outputBuffer(context, CL_MEM_READ_WRITE, output.size() * sizeof(float));
+    cl::Buffer layersBuffer(context, layers.begin(), layers.end(), true);
+    cl::Buffer weightsBuffer(context, weights.begin(), weights.end(), true);
+    cl::Buffer valuesBuffer(context, values.begin(), values.end(), false);
+    cl::Buffer inputBuffer(context, input.begin(), input.end(), true);
+    cl::Buffer outputBuffer(context, output.begin(), output.end(), false);
+    cl::Buffer countersBuffer(context, counters.begin(), counters.end(), false);
 
-    queue.enqueueWriteBuffer(inputBuffer, CL_TRUE, 0, input.size() * sizeof(float),
-            input.data());
-
+    kernel.setArg(0, layersBuffer);
+    kernel.setArg(1, weightsBuffer);
+    kernel.setArg(2, countersBuffer);
     kernel.setArg(3, valuesBuffer);
     kernel.setArg(4, inputBuffer);
     kernel.setArg(5, outputBuffer);
+    kernel.setArg(6, (int) values.size());
+    kernel.setArg(7, (int) layers.size());
 
-    queue.enqueueNDRangeKernel(holder.getKernel(), cl::NullRange, holder.getGlobalRange(), holder.getLocalRange());
+    // TODO: fix working group size - 1 is extremely inefficient
+    queue.enqueueNDRangeKernel(holder.getKernel(), cl::NullRange, holder.getGlobalRange(), cl::NDRange(1));
     queue.finish();
 
-    queue.enqueueReadBuffer(outputBuffer, CL_TRUE, 0, output.size() * sizeof(float), output.data());
+    cl::copy(queue, outputBuffer, output.begin(), output.end());
 }
 
-int main() {
+void testXor() {
     FullyConnectedNN network = loadFullyConnectedNN("network_xor");
 
-    vector<size_t> layerSizes = network.getSizes();
+    vector<int> layerSizes = network.getSizes();
     vector<float> weights = network.getAllWeights();
     vector<float> values = network.getEmptyValues();
     vector<vector<float>> inputs = {{0, 0}, {0, 1}, {1, 0}, {1, 1}};
-    vector<vector<float>> expectedOutputs = {{0}, {1}, {1}, {0}};
-    vector<int> counters(layerSizes.begin() + 1, layerSizes.end());
+    vector<vector<float>> expectedOutputs = {{-1.71589994}, {1.71589994}, {1.71589994}, {-1.71589994}};
+    vector<int> counters(layerSizes.begin(), layerSizes.end());
+    counters[0] = 0;
 
-    ClStructHolder clStructValues = buildClHolder("neuron.cl", layerSizes, weights, "neuron", counters);
-    for (size_t i = 0; i < inputs.size(); ++i) {
-        vector<float> predictedOutput(layerSizes.back());
-        loopFunction(clStructValues, values, inputs[i], predictedOutput);
-        cout << i << ": " << (predictedOutput == expectedOutputs[i] ? "correct" : "wrong") << endl;
+    try {
+        ClStructHolder clStructValues = buildClHolder("neuron.cl", layerSizes, weights, "neuron");
+        for (size_t i = 0; i < inputs.size(); ++i) {
+            vector<float> input;
+            input.push_back(1);
+            input.insert(input.end(), inputs[i].begin(), inputs[i].end());
+            vector<float> predictedOutput(layerSizes.back());
+            processSignleInput(clStructValues, layerSizes, weights, values, input, predictedOutput, counters);
+            cout << i << ": " << (predictedOutput == expectedOutputs[i] ? "correct" : "wrong") << endl;
+        }
+    } catch (const cl::Error& e) {
+        cerr << errCode(e.err()) << endl;
+    } catch (const exception& e) {
+        cerr << e.what() << endl;
     }
+}
+
+int main() {
+    testXor();
     return 0;
 }

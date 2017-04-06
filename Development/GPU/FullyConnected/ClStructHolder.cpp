@@ -1,12 +1,10 @@
 #include "ClStructHolder.h"
 
-ClStructHolder::ClStructHolder(cl::Context context, cl::CommandQueue queue, cl::Kernel kernel, size_t threadNumber,
-        size_t groupSize) :
+ClStructHolder::ClStructHolder(cl::Context context, cl::CommandQueue queue, cl::Kernel kernel, size_t threadNumber) :
         context(context),
         queue(queue),
         kernel(kernel),
-        globalRange(threadNumber),
-        localRange(groupSize) {
+        globalRange(threadNumber) {
 }
 
 const cl::Context& ClStructHolder::getContext() const {
@@ -23,8 +21,4 @@ cl::Kernel& ClStructHolder::getKernel() {
 
 const cl::NDRange& ClStructHolder::getGlobalRange() const {
     return globalRange;
-}
-
-const cl::NDRange& ClStructHolder::getLocalRange() const {
-    return localRange;
 }

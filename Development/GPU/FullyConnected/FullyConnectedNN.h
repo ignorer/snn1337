@@ -16,7 +16,7 @@ public:
 
     void printEmptyValues();
 
-    std::vector<size_t> getSizes();
+    std::vector<int> getSizes();
 
     std::vector<float> getAllWeights();
 
