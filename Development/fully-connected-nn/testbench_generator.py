@@ -2,8 +2,9 @@ import fcnn_generator as code_generator
 import simple_fcnn as network_generator
 import numpy as np
 
-class FCNNTestbenchGenerator():
-    def __init__(self, bus_width=16, decimal_precision=3, eps = 0.1, seed=1337):
+
+class FCNNTestbenchGenerator:
+    def __init__(self, bus_width=16, decimal_precision=3, eps=0.1, seed=1337):
         self.bus_width = bus_width
         self.decimal_precision = decimal_precision
         self.eps = eps
@@ -11,20 +12,20 @@ class FCNNTestbenchGenerator():
 
     def generate_testbench(self, layer_sizes, test_count):
         fcnn = network_generator.FCNN(layer_sizes, self.seed, network_generator.fpga_sigmoid)
-        fpgaNet = fcnn.get_fpga_network(self.decimal_precision)
+        fpga_net = fcnn.get_fpga_network(self.decimal_precision)
 
-        inputs = [np.random.randint(0, 2, layer_sizes[0]).astype(float) for i in range(0, test_count)]
+        inputs = [np.random.randint(0, 2, layer_sizes[0]).astype(float) for _ in range(0, test_count)]
         results = [fcnn.predict(input) for input in inputs]
 
-        codeGen = code_generator.FCNNGenerator(self.bus_width, self.decimal_precision)
+        code_gen = code_generator.FCNNGenerator(self.bus_width, self.decimal_precision)
 
         # start generating code
-        source = codeGen.generate_network_module(fpgaNet)
+        source = code_gen.generate_network_module(fpga_net)
 
         # assert
         source += '\n`define assert_close(expected, got, eps) \\\n'
         source += 'if ((expected > got && expected > got + eps) || (expected < got && expected + eps < got)) begin \\\n'
-        source += '    $display("TEST FAILED in %m: got %d, exprected %d", got, expected); \\\n'
+        source += '    $display("TEST FAILED in %m: got %d, expected %d", got, expected); \\\n'
         source += '    $stop; \\\n'
         source += 'end\n\n'
 
@@ -82,6 +83,10 @@ class FCNNTestbenchGenerator():
         source += 'endmodule\n'
         return source
 
-if (__name__ == '__main__'):
-    t = FCNNTestbenchGenerator()
-    print(t.generate_testbench([2, 1], 10))
+
+if __name__ == '__main__':
+    testbench_generator = FCNNTestbenchGenerator()
+    output = testbench_generator.generate_testbench([2, 4, 2, 2], 10)
+    with open('fcnn_testbench.sv', 'w') as output_file:
+        output_file.write(output)
+    print(output)

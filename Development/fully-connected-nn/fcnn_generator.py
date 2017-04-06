@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class FCNNGenerator:
     def __init__(self, bus_width=16, decimal_precision=3):
         self.bus_width = bus_width
@@ -9,7 +10,7 @@ class FCNNGenerator:
         self.layers = dict()
 
     def generate_layer_module(self, num_inputs, num_outputs):
-        if ((num_inputs, num_outputs) in self.layers):
+        if (num_inputs, num_outputs) in self.layers:
             return self.layers[(num_inputs, num_outputs)]
         # module declaration
         source = f'module layer{num_inputs}in{num_outputs}out(clk, rst, '
@@ -29,11 +30,11 @@ class FCNNGenerator:
         source += 'input wire clk;\ninput wire rst;\n\n'
 
         for i in range(num_inputs):
-            source += f'input [{self.bus_width - 1}:0] in{i};\n'
+            source += f'input signed [{self.bus_width - 1}:0] in{i};\n'
         source += '\n'
 
         for i in range(num_outputs):
-            source += f'output [{self.bus_width - 1}:0] out{i};\n'
+            source += f'output signed [{self.bus_width - 1}:0] out{i};\n'
         source += '\n'
 
         self.generate_neuron_module(num_inputs)
@@ -81,11 +82,11 @@ class FCNNGenerator:
         source += 'input wire clk;\n' + 'input wire rst;\n\n'
 
         for i in range(num_inputs):
-            source += f'input [{self.bus_width - 1}:0] in{i};\n'
+            source += f'input signed [{self.bus_width - 1}:0] in{i};\n'
         source += '\n'
 
         for i in range(num_outputs):
-            source += f'output [{self.bus_width - 1}:0] out{i};\n'
+            source += f'output signed [{self.bus_width - 1}:0] out{i};\n'
         source += '\n'
 
         # connectors
@@ -153,7 +154,7 @@ class FCNNGenerator:
         return int(num * (10 ** self.decimal_precision) + 0.5)
 
     def generate_neuron_module(self, num_inputs):
-        if (num_inputs in self.neurons):
+        if num_inputs in self.neurons:
             return self.neurons[num_inputs]
         # module declaration
         source = f'module neuron{num_inputs}in(clk, rst, '
@@ -173,7 +174,7 @@ class FCNNGenerator:
             source += f'input signed [{self.bus_width - 1}:0] in{i};\n'
         source += '\n'
 
-        source += f'output reg [{self.bus_width - 1}:0] out;\n\n'
+        source += f'output signed reg [{self.bus_width - 1}:0] out;\n\n'
 
         # neuron logic
         source += f'reg signed [{self.extended_width - 1}:0] x;\n'
@@ -186,14 +187,18 @@ class FCNNGenerator:
         source += f'in{num_inputs - 1} * W{num_inputs - 1} / {self.get_decimal(1)};\n'
         source += '    abs_x = x < 0 ? -x : x;\n'
         source += f'    if (abs_x >= {self.get_decimal(5)}) y = {self.get_decimal(1)};\n'
-        source += f'    else if (abs_x >= {self.get_decimal(2.375)}) y = {self.get_decimal(0.03125)} * abs_x / {self.get_decimal(1)} + {self.get_decimal(0.84375)};\n'
-        source += f'    else if (abs_x >= {self.get_decimal(1)}) y = {self.get_decimal(0.125)} * abs_x / {self.get_decimal(1)} + {self.get_decimal(0.625)};\n'
-        source += f'    else if (abs_x >= 0) y = {self.get_decimal(0.25)} * abs_x / {self.get_decimal(1)} + {self.get_decimal(0.5)};\n'
+        source += f'    else if (abs_x >= {self.get_decimal(2.375)}) y = {self.get_decimal(0.03125)} * abs_x /' \
+                  f' {self.get_decimal(1)} + {self.get_decimal(0.84375)};\n'
+        source += f'    else if (abs_x >= {self.get_decimal(1)}) y = {self.get_decimal(0.125)} * abs_x /' \
+                  f' {self.get_decimal(1)} + {self.get_decimal(0.625)};\n'
+        source += f'    else if (abs_x >= 0) y = {self.get_decimal(0.25)} * abs_x /' \
+                  f' {self.get_decimal(1)} + {self.get_decimal(0.5)};\n'
         source += '    out = y;\n'
         source += 'end\n\n'
         source += 'endmodule\n\n'
         self.neurons[num_inputs] = source
         return self.neurons[num_inputs]
+
 
 if __name__ == '__main__':
     generator = FCNNGenerator()

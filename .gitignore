@@ -34,3 +34,10 @@
 # CMake Build Results
 cmake-build-debug/
 cmake-build-relese/
+
+# Python cache
+__pycache__/
+
+# ModelSim output
+*.wlf
+work/ # default name for library (may remove if necessary)

@@ -1,28 +1,33 @@
 import numpy as np
 
+
 def sigmoid(x):
     return 1. / (1. + np.exp(-x))
+
 
 def sigmoid_derivative(x):
     return x * (1. - x)
 
+
 def fpga_sigmoid_simple(x):
     abs_x = np.abs(x)
-    if (abs_x >= 5):
+    if abs_x >= 5:
         y = 1.
-    elif (abs_x >= 2.375):
+    elif abs_x >= 2.375:
         y = 0.03125 * abs_x + 0.84375
-    elif (abs_x >= 1):
+    elif abs_x >= 1:
         y = 0.125 * abs_x + 0.625
     else:
         y = 0.25 * abs_x + 0.5
     return y
 
+
 def fpga_sigmoid(x):
     return np.vectorize(fpga_sigmoid_simple)(x)
 
-class FCNN():
-    def __init__(self, layer_sizes, seed = 1337, activation = sigmoid, activation_derivative = sigmoid_derivative):
+
+class FCNN:
+    def __init__(self, layer_sizes, seed=1337, activation=sigmoid, activation_derivative=sigmoid_derivative):
         self.activation = activation
         self.activation_derivative = activation_derivative
         np.random.seed(seed)
@@ -54,6 +59,7 @@ class FCNN():
             res.append((layer * (10 ** decimal_precision) + 0.5).astype(int))
         return res
 
+
 if __name__ == "__main__":
     net = FCNN([2, 2, 1])
 
@@ -65,4 +71,3 @@ if __name__ == "__main__":
     print(net.predict(np.array([0, 1]))[-1])
     print(net.predict(np.array([1, 0]))[-1])
     print(net.predict(np.array([1, 1]))[-1])
-
