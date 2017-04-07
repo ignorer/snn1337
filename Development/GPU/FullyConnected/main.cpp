@@ -139,7 +139,7 @@ void testXor() {
 }
 
 void testDigits() {
-    FullyConnectedNN network = loadFullyConnectedNN("newtwork_digits");
+    FullyConnectedNN network = loadFullyConnectedNN("network_digits");
 
     vector<int> layerSizes = network.getSizes();
     vector<float> weights = network.getAllWeights();
@@ -157,7 +157,10 @@ void testDigits() {
         holder.getKernel().setArg(1, weightsBuffer);
 
         auto start = chrono::steady_clock::now();
-        for (size_t i = 0; i < inputs.size() * 1000; ++i) {
+        int imagesNumber = 10000;
+        int correctOutputNumber = 0;
+
+        for (size_t i = 0; i < imagesNumber; ++i) {
             vector<float> input;
             input.push_back(1);
             input.insert(input.end(), inputs[i % inputs.size()].begin(), inputs[i % inputs.size()].end());
@@ -166,11 +169,15 @@ void testDigits() {
 
             bool isOutputCorrect = true;
             for (int j = 0; j < predictedOutput.size(); ++j) {
-                isOutputCorrect = isOutputCorrect && (predictedOutput[j] - expectedOutputs[i % inputs.size()][j]) < 1e-5;
+                isOutputCorrect =
+                        isOutputCorrect && (predictedOutput[j] - expectedOutputs[i % inputs.size()][j]) < 0.45;
             }
-            //            cout << i << ": " << (isOutputCorrect ? "correct" : "wrong") << endl;
+            if (isOutputCorrect) {
+                ++correctOutputNumber;
+            }
         }
         cout << chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start).count() << endl;
+        cout << float(correctOutputNumber) / imagesNumber << endl;
 
     } catch (const cl::Error& e) {
         cerr << errCode(e.err()) << endl;

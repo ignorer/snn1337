@@ -1,5 +1,6 @@
 project(FullyConnected)
 
+include_directories(${OpenCL_INCLUDE_DIRS})
 include_directories(${GPU_SOURCE_DIR}/include)
 
 set(SOURCE_FILES main.cpp FullyConnectedNN.cpp Layer.cpp ClStructHolder.cpp)
@@ -13,3 +14,5 @@ file(COPY neuron.cl DESTINATION .)
 # copy resources to working directory
 file(COPY network_digits DESTINATION .)
 file(COPY network_xor DESTINATION .)
+file(COPY input_digits DESTINATION .)
+file(COPY output_digits DESTINATION .)
