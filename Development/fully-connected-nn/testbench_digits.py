@@ -3,17 +3,17 @@ from fcnn_generator import FCNNGenerator
 
 
 class FCNNDigitsTestbenchGenerator:
-    def __init__(self, bus_width=16, decimal_precision=3):
+    def __init__(self, bus_width=16, decimal_precision=5):
         self.bus_width = bus_width
         self.decimal_precision = decimal_precision
         self.num_inputs = 64
         self.num_outputs = 10
 
     def read_data(self):
-        input_data = np.loadtxt('input_digits.txt', dtype='int', delimiter=' ')
-        input_data *= 10**self.decimal_precision
-        output_data = np.loadtxt('output_digits.txt', dtype='int', delimiter=' ')
-        output_data *= 10**self.decimal_precision
+        input_data = np.loadtxt('input_digits.txt', dtype='i', delimiter=' ')
+        # input_data *= 10**self.decimal_precision
+        output_data = np.loadtxt('output_digits.txt', dtype='i', delimiter=' ')
+        output_data *= 10 ** self.decimal_precision
 
         num_layers = 2
         weight_matrices = []
@@ -45,8 +45,10 @@ class FCNNDigitsTestbenchGenerator:
         source += 'logic clk;\nlogic rst;\n\n'
 
         source += f'reg [{self.bus_width - 1}:0] '
-        for i in range(self.num_inputs):
+        for i in range(self.num_inputs - 1):
             source += f'net_in{i}, '
+        source += f'net_in{self.num_inputs - 1};\n'
+        source += f'wire [{self.bus_width - 1}:0] '
         for i in range(self.num_outputs - 1):
             source += f'net_out{i}, '
         source += f'net_out{self.num_outputs - 1};\n\n'
@@ -68,21 +70,21 @@ class FCNNDigitsTestbenchGenerator:
         source += 'begin\n'
         for i in range(self.num_inputs):
             source += f'    net_in{i} = in{i};\n'
-        source += '    #1000ns\n\n'
+        source += '    #10000000\n\n'
 
-        for i in range(self.num_outputs - 1):
-            source += f"    $write(net_out{i}); $write(' ');\n"
-        source += '    $display()\n'
+        for i in range(self.num_outputs):
+            source += f'    $write("%d ", net_out{i});\n'
+        source += '    $display();\n'
         source += 'end\n'
         source += 'endtask\n\n'
 
         # run all tests
         source += 'initial begin\n'
-        for i in range(len(input_sample) % 100): # only 100 tests
+        for i in range(10):  # 10 tests
             source += '    test('
-            for j in range(self.num_inputs):
+            for j in range(self.num_inputs - 1):
                 source += f'{input_sample[i, j]}, '
-            source += f'{input_sample[i, j]});\n'
+            source += f'{input_sample[i, self.num_inputs - 1 ]});\n'
 
         source += 'end\n'
         source += 'endmodule\n'
