@@ -174,7 +174,7 @@ class FCNNGenerator:
             source += f'input signed [{self.bus_width - 1}:0] in{i};\n'
         source += '\n'
 
-        source += f'output signed reg [{self.bus_width - 1}:0] out;\n\n'
+        source += f'output reg signed [{self.bus_width - 1}:0] out;\n\n'
 
         # neuron logic
         source += f'reg signed [{self.extended_width - 1}:0] x;\n'
@@ -215,4 +215,3 @@ if __name__ == '__main__':
             9, 10
         ]).reshape((2, 1)))
     ]
-    print(generator.generate_network_module(weights))
