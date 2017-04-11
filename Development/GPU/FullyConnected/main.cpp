@@ -138,7 +138,55 @@ void testXor() {
     }
 }
 
+void testDigits() {
+    FullyConnectedNN network = loadFullyConnectedNN("network_digits");
+
+    vector<int> layerSizes = network.getSizes();
+    vector<float> weights = network.getAllWeights();
+    vector<float> values = network.getEmptyValues();
+    vector<vector<float>> inputs = network.getInput("input_digits");
+    vector<vector<float>> expectedOutputs = network.getOutput("output_digits");
+    vector<int> counters(layerSizes.begin(), layerSizes.end());
+    counters[0] = 0;
+
+    try {
+        ClStructHolder holder = buildClHolder("neuron.cl", layerSizes, weights, "neuron");
+        cl::Buffer layersBuffer(holder.getContext(), layerSizes.begin(), layerSizes.end(), true);
+        cl::Buffer weightsBuffer(holder.getContext(), weights.begin(), weights.end(), true);
+        holder.getKernel().setArg(0, layersBuffer);
+        holder.getKernel().setArg(1, weightsBuffer);
+
+        auto start = chrono::steady_clock::now();
+        int imagesNumber = 10000;
+        int correctOutputNumber = 0;
+
+        for (size_t i = 0; i < imagesNumber; ++i) {
+            vector<float> input;
+            input.push_back(1);
+            input.insert(input.end(), inputs[i % inputs.size()].begin(), inputs[i % inputs.size()].end());
+            vector<float> predictedOutput(layerSizes.back());
+            processSignleInput(holder, layerSizes, weights, values, input, predictedOutput, counters);
+
+            bool isOutputCorrect = true;
+            for (int j = 0; j < predictedOutput.size(); ++j) {
+                isOutputCorrect =
+                        isOutputCorrect && (predictedOutput[j] - expectedOutputs[i % inputs.size()][j]) < 0.45;
+            }
+            if (isOutputCorrect) {
+                ++correctOutputNumber;
+            }
+        }
+        cout << chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start).count() << endl;
+        cout << float(correctOutputNumber) / imagesNumber << endl;
+
+    } catch (const cl::Error& e) {
+        cerr << errCode(e.err()) << endl;
+    } catch (const exception& e) {
+        cerr << e.what() << endl;
+    }
+}
+
 int main() {
-    testXor();
+    testDigits();
     return 0;
 }
