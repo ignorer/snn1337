@@ -10,14 +10,14 @@ class FCNNDigitsTestbenchGenerator:
         self.num_outputs = 10
 
     def read_data(self):
-        input_data = np.loadtxt('input_digits.txt', dtype='i', delimiter=' ')
-        # input_data *= 10**self.decimal_precision
-        output_data = np.loadtxt('output_digits.txt', dtype='i', delimiter=' ')
+        input_data = np.loadtxt('../test/input_digits.txt', dtype='i', delimiter=' ')
+        input_data *= 10 ** self.decimal_precision
+        output_data = np.loadtxt('../test/output_digits.txt', dtype='i', delimiter=' ')
         output_data *= 10 ** self.decimal_precision
 
         num_layers = 2
         weight_matrices = []
-        with open('network_digits.txt') as network_data_file:
+        with open('../test/network_digits.txt') as network_data_file:
             for _ in range(num_layers):
                 num_lines = int(network_data_file.readline())
                 matrix = []
@@ -93,8 +93,8 @@ class FCNNDigitsTestbenchGenerator:
 
 
 if __name__ == '__main__':
-    testbench_generator = FCNNDigitsTestbenchGenerator()
+    testbench_generator = FCNNDigitsTestbenchGenerator(decimal_precision=3)
     verilog_source = testbench_generator.generate_testbench()
-    with open('fcnn_testbench_digits.sv', 'w') as verilog_file:
+    with open('../test/fcnn_digits_tb.sv', 'w') as verilog_file:
         verilog_file.write(verilog_source)
     print(testbench_generator.read_data()[2])

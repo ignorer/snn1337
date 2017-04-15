@@ -87,6 +87,6 @@ class FCNNTestbenchGenerator:
 if __name__ == '__main__':
     testbench_generator = FCNNTestbenchGenerator()
     output = testbench_generator.generate_testbench([2, 4, 2, 2], 10)
-    with open('fcnn_testbench.sv', 'w') as output_file:
+    with open('../test/fcnn_rand_tb.sv', 'w') as output_file:
         output_file.write(output)
     print(output)
