@@ -1,1 +1,0 @@
-/usr/bin/c++       CMakeFiles/ignorer.dir/main.cpp.o  -o ignorer -rdynamic 
