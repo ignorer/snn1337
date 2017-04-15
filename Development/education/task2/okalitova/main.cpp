@@ -6,8 +6,8 @@
 
 #define __CL_ENABLE_EXCEPTIONS
 
-#include "../include/cl.hpp"
-#include "../include/err_code.h"
+#include <cl.hpp>
+#include <err_code.h>
 
 using namespace std;
 
@@ -16,7 +16,54 @@ void printError(cl::Error err) {
     std::cerr << "ERROR: " << err.what() << "(" << err_code(err.err()) << ")" << std::endl;
 }
 
-std::unique_ptr<int[]> performTaskOnDevice(cl::Device device, int n, std::string filename) {
+class Matrix {
+private:
+    int n, m;
+    vector<vector<int>> matrix;
+public:
+    Matrix(int n, int m) {
+        this->n = n;
+        this->m = m;
+        for (int i = 0; i < n; i++) {
+            matrix.push_back(vector<int>(m));
+            for (int j = 0; j < m; j++) {
+                if (random) {
+                    matrix[i][j] = rand() % 100;
+                }
+            }
+        }
+    }
+
+    vector<int> getPlainMatrix() {
+        vector<int> plainMatrix;
+        for (int i = 0; i < matrix.size(); i++) {
+            for (int j = 0; j < matrix[i].size(); j++) {
+                plainMatrix.push_back(matrix[i][j]);
+            }
+        }
+        return plainMatrix;
+    }
+
+    int getN() const {
+        return n;
+    }
+
+    int getM() const {
+        return m;
+    }
+
+    void print() {
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < m; j++) {
+                cout << matrix[i][j] << " ";
+            }
+            cout << "\n";
+        }
+    }
+};
+
+std::unique_ptr<int[]> performTaskOnDevice(cl::Device device, std::string filename,
+    Matrix A, Matrix B) {
     try {
         std::vector<cl::Device> contextDevices;
         contextDevices.push_back(device);
@@ -29,17 +76,37 @@ std::unique_ptr<int[]> performTaskOnDevice(cl::Device device, int n, std::string
 
         cl::Program::Sources source(1, std::make_pair(sourceCode.c_str(), sourceCode.length()+1));
         cl::Program program(context, sourceCode, true);
-        cl::Kernel kernel(program, "arrayIndeces");
+        cl::Kernel kernel(program, "matrixMultiplication");
 
+        vector<int> a = A.getPlainMatrix();
+        vector<int> b = B.getPlainMatrix();
+
+        cl::Buffer clmInputVector1 = cl::Buffer(context,
+            CL_MEM_READ_ONLY, a.size() * sizeof(int));
+        cl::Buffer clmInputVector2 = cl::Buffer(context,
+            CL_MEM_READ_ONLY, b.size() * sizeof(int));
         cl::Buffer clmOutputVector = cl::Buffer(context,
-            CL_MEM_READ_WRITE, n * sizeof(int));
-        kernel.setArg(0, clmOutputVector);
+            CL_MEM_READ_WRITE, A.getN() * B.getM() * sizeof(int));
+        cl::copy(queue, a.begin(), a.end(), clmInputVector1);
+        cl::copy(queue, b.begin(), b.end(), clmInputVector2);
 
-        queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(n), cl::NullRange);
+        kernel.setArg(0, clmInputVector1);
+        kernel.setArg(1, clmInputVector2);
+        kernel.setArg(2, clmOutputVector);
+        kernel.setArg(3, A.getN());
+        kernel.setArg(4, A.getM());
+        kernel.setArg(5, B.getM());
+
+        int workDim = 2;
+        int globalWorkSize[workDim] = {A.getN(), B.getM()};
+        queue.enqueueNDRangeKernel(kernel,
+            cl::NullRange, cl::NDRange(globalWorkSize[0], globalWorkSize[1]), cl::NullRange);
+
         queue.finish();
 
-        auto pOutputVector = std::make_unique<int[]>(n);
-        queue.enqueueReadBuffer(clmOutputVector, CL_TRUE, 0, n * sizeof(int), pOutputVector.get());
+        auto pOutputVector = std::make_unique<int[]>(A.getN() * B.getM());
+        queue.enqueueReadBuffer(clmOutputVector, CL_TRUE, 0,
+            A.getN() * B.getM() * sizeof(int), pOutputVector.get());
 
         return std::move(pOutputVector);
     } catch (cl::Error err) {
@@ -66,34 +133,22 @@ cl::Device getDevice() {
     }
 }
 
-class Matrix {
-  private:
-    vector<vector<int>> matrix;
-  public:
-    Matrix(int n, int m) {
-        srand(43);
-        for (int i = 0; i < n; i++) {
-            matrix.push_back(vector<int>(m));
-            for (int j = 0; j < m; j++) {
-                if (random) {
-                    matrix[i][j] = rand() % 100;
-                }
-            }
-        }
-    }
-};
-
 int main(int argv, char** argc) {
-    int n;
+    srand(43);
     std::string filename = "matrixMultiplication.cl";
-    std::cin >> n;
 
     try {
         cl::Device device = getDevice();
 
-        std::unique_ptr<int[]> ans = performTaskOnDevice(device, n, filename);
-        for (int i = 0; i < n; i++) {
-            std::cout << ans.get()[i] << " ";
+        Matrix A(2, 3);
+        Matrix B(3, 4);
+
+        std::unique_ptr<int[]> ans = performTaskOnDevice(device,filename, A, B);
+        for (int i = 0; i < A.getN(); i++) {
+            for (int j = 0; j < B.getM(); j++) {
+                std::cout << ans.get()[i * B.getM() + j] << " ";
+            }
+            cout << "\n";
         }
     } catch (cl::Error err) {
         printError(err);
