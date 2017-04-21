@@ -5,7 +5,7 @@ It is a simple module that counts XOR function
 Uses neuron_example_simple inside
 */
 
-module spiking_neural_network_xor(clk, rst, addr, cmd, cmd_arg, in1, in2, out);
+module spiking_neural_network_xor(clk, rst, addr, cmd, cmd_arg, in1, in2, out, out_time);
   parameter INT_WIDTH = 4;
   parameter INT_MSB = INT_WIDTH - 1;
   parameter INT_MAX = (1 << INT_WIDTH) - 1;
@@ -18,6 +18,8 @@ module spiking_neural_network_xor(clk, rst, addr, cmd, cmd_arg, in1, in2, out);
   
   parameter SILENT = 1;
   
+  parameter MAX_TIME = 20;
+  
   input wire clk;
   input wire rst;
   wire neurons_rst;
@@ -26,6 +28,7 @@ module spiking_neural_network_xor(clk, rst, addr, cmd, cmd_arg, in1, in2, out);
   input wire in2;
   
   output reg out;
+  output reg [31:0] out_time;
 
   input reg [CMD_WIDTH - 1 : 0] cmd;
   input reg [ADDR_WIDTH - 1 : 0] addr;
@@ -67,24 +70,35 @@ module spiking_neural_network_xor(clk, rst, addr, cmd, cmd_arg, in1, in2, out);
     neuron_0_1_out = 0;
     neuron_0_2_out = 0;
     preout = 0;
+    out_time = MAX_TIME;
   end
   
   always @(posedge clk)
   begin
     if (!SILENT) $display("Neural network: New clk! (%3d)", counter);
+    
+    if (cmd == 0)
+    begin
+      counter = 0;
+      preout = 0;
+      out_time = MAX_TIME;
+    end
+      
+      
     case (counter)
-      10 : begin
+      0 : begin
         if (!SILENT) $display("Neural network: Start argument pulses");
         neuron_0_1_out = in1;
         neuron_0_2_out = in2;
       end
-      11 : begin
+      1 : begin
         if (!SILENT) $display("Neural network: Finish argument pulses");
         neuron_0_1_out = 0;
         neuron_0_2_out = 0;
       end
-      30 : begin
+      MAX_TIME : begin
         out = preout;
+        out_time = counter;
       end   
     endcase;
     if (neuron_2_1_out)

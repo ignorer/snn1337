@@ -12,6 +12,7 @@ add wave /example_network_tb/rst
 add wave /example_network_tb/neural_network/in1
 add wave /example_network_tb/neural_network/in2
 add wave -radix decimal /example_network_tb/neural_network/counter
+add wave -radix decimal /cmd
 add wave /example_network_tb/neural_network/neuron_0_1_out
 add wave /example_network_tb/neural_network/neuron_0_2_out
 add wave /example_network_tb/neural_network/neuron_1_1_out

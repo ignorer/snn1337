@@ -1,7 +1,7 @@
 `define assert_equal(expected, got) \
   if (expected !== got) begin \
     $display("ASSERTION FAILED in %m: got %d != %d expected", got, expected); \
-    $stop;
+    $stop; \
   end
 
 module example_network_tb;
@@ -23,6 +23,8 @@ module example_network_tb;
   
   reg neural_nework_in1, neural_nework_in2, neural_nework_out;
   
+  reg [31:0] neural_network_out_time;
+  
   spiking_neural_network_xor #(
     .INT_WIDTH(INT_WIDTH),
     .SILENT(0)
@@ -32,7 +34,8 @@ module example_network_tb;
     .addr(addr), .cmd(cmd), .cmd_arg(weight),
     .in1(neural_nework_in1),
     .in2(neural_nework_in2),
-    .out(neural_nework_out)
+    .out(neural_nework_out),
+    .out_time(neural_network_out_time)
   );
   
   task set_weight;
@@ -82,7 +85,11 @@ module example_network_tb;
       set_weight(3, 1, -INT_MAX);
       set_weight(3, 2, INT_MAX);
       
-      #500ns // wait for calculations
+      cmd = 0;
+      #20ns;
+      cmd = -1;
+      
+      #500ns; // wait for calculations
             
       `assert_equal(expected, neural_nework_out);
     end
