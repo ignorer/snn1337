@@ -1,9 +1,6 @@
-//
-// Created by mariia on 22.04.2017.
-//
+#pragma once
 
-#ifndef GPU_CLSTRUCTHOLDER_H
-#define GPU_CLSTRUCTHOLDER_H
+#include <cl.hpp>
 
 class ClStructHolder {
 private:
@@ -20,4 +17,3 @@ public:
     cl::Kernel& getKernel();
     const cl::NDRange& getGlobalRange() const;
 };
-#endif //GPU_CLSTRUCTHOLDER_H
