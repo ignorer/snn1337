@@ -12,7 +12,7 @@
     vector<int> trainImagesLabels = ir.getTestImagesLabels();
     //every input vector should be transformed to the vector of frequencies
     //frequencies are integers from 125 to 250
-    vector<int> freq = ir.getFrequencies(train[0]);
+    vector<int> freq = ir.getFrequencies(trainImagesData[0]);
  }
 \endcode
 
