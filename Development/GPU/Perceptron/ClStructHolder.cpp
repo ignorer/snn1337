@@ -1,6 +1,3 @@
-//
-// Created by mariia on 22.04.2017.
-//
 #include "ClStructHolder.h"
 
 ClStructHolder::ClStructHolder(cl::Context context, cl::CommandQueue queue, cl::Kernel kernel, size_t threadNumber) :
@@ -25,4 +22,3 @@ cl::Kernel& ClStructHolder::getKernel() {
 const cl::NDRange& ClStructHolder::getGlobalRange() const {
     return globalRange;
 }
-
