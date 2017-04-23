@@ -11,6 +11,7 @@ target_link_libraries(FullyConnectedSNN ${OpenCL_LIBRARY})
 set_property(TARGET FullyConnectedSNN PROPERTY CXX_STANDARD 14)
 
 # copy resources to working directory
+file(COPY neuron.cl DESTINATION .)
 file(COPY res/network DESTINATION ./res)
 file(COPY res/network_test DESTINATION ./res)
 file(COPY mnist DESTINATION .)

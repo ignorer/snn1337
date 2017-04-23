@@ -81,8 +81,8 @@ void processSignleInput(ClStructHolder& holder, vector<int>& sizes, vector<float
     cl::Buffer outputBuffer(context, output.begin(), output.end(), false);
 
 //    kernel.setArg(8, countersBuffer);
-    kernel.setArg(9, inputBuffer);
-    kernel.setArg(10, outputBuffer);
+    kernel.setArg(10, inputBuffer);
+    kernel.setArg(11, outputBuffer);
     kernel.setArg(6, spikesBuffer);
     kernel.setArg(1, (int) sizes.size());
 
