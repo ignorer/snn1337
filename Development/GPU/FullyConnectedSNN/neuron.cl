@@ -1,6 +1,7 @@
 #pragma OPENCL EXTENSION cl_khr_global_int32_base_atomics : enable
 
 #define DELTA_T 15
+#define SPIKES_SIZE 2048
 
 inline float refractoryFunc(float t, float threshold, float tau) {
     if (t >= 0)
@@ -14,18 +15,15 @@ inline float spikeFunc(float t, float tau) {
     return 0;
 }
 
-float calcRecievedPot(__global const float* weights, __global int* spikes,
-                      int spikesPerSyn, int synPerConn, size_t connNum) {
-
-    // FIX pot should be calcd dinamically
+void calcRecvPot(__private float* recvPot,__global const float* weights, __global const int* spikes,
+                 int spikesPerSyn, int synPerConn, size_t connNum) {
+    // recivedPot is a precalculated hash-table [{spikeTime : its potential}, ...]
     int i;
     int j;
-    float result;
     for (j = 0; j < connNum * synPerConn; ++j) {
         for (i = 0; i < spikesPerSyn; ++i)
-            result += weights[j] * spikeFunc(spikes[j * spikesPerSyn + i], 1.0);
+            recvPot[spikes[j * spikesPerSyn + i]] += weights[j] * spikeFunc(spikes[j * spikesPerSyn + i], 1.0);
     }
-    return result;
 }
 
 int calcSpikesNum(__global const int* layersSz, int layerNum, int synPerConn, int spikesPerSyn) {
@@ -83,7 +81,6 @@ __global const float* calcWeightsStart(__global const float* weights, __global c
     for (i = 0; i < layerId - 1; ++i) {
         weights += layersSz[i] * layersSz[i + 1] * synPerConn;
     }
-
     // skip all neurons on this layer
     weights += (layersSz[layerId - 1]) * synPerConn * neuronId;
     return weights;
@@ -119,15 +116,20 @@ __kernel void neuron(
     __global int* outputVec = calcTargetSpikesPtr(spikes, output, layersNum, spikesNum, layerId, globalId);
     __global const int* inputSpikesVec = calcPrevLayerStart(input, spikes, layersSz, layerId, synPerConn, spikesPerSyn);
     __global const float* weightsVec = calcWeightsStart(weights, layersSz, synPerConn, layerId, neuronId);
+    __private float spikePots[SPIKES_SIZE]; // FIX ME: should be __global argument
     int i;
+    for(i = 0; i < SPIKES_SIZE; ++i)
+        spikePots[i] = 0.0;
+    calcRecvPot(spikePots, weightsVec, inputSpikesVec, spikesPerSyn, synPerConn, layersSz[layerId - 1]);
+
     int j;
     float pot = 0;
     while (*t < exitTime) {
         for (i = 0; i < DELTA_T; ++i) {
-            pot += calcRecievedPot(weightsVec, inputSpikesVec, spikesPerSyn, synPerConn, layersSz[layerId - 1]);
+            pot += spikePots[*t+i]; // could be no spike in time (*t + i)
             if (pot > threshold) {
-                outputVec[j++] = t + i;
-                pot += refractoryFunc(i, threshold, 1.0); // i is current spike's time = (t+i) - t
+                outputVec[j++] = *t + i;
+                pot += refractoryFunc(i, threshold, 1.0); // i is current spike's time = (*t+i) - *t
             }
         }
         atomic_cmpxchg(t, *t + DELTA_T, *t + DELTA_T);
