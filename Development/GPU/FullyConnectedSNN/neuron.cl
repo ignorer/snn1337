@@ -14,7 +14,7 @@ inline float spikeFunc(float t, float tau) {
     return 0;
 }
 
-float calcRecievedpot(int time, __global const float* weights, __global int* spikes,
+float calcRecievedPot(__global const float* weights, __global int* spikes,
                       int spikesPerSyn, int synPerConn, size_t connNum) {
 
     // FIX pot should be calcd dinamically
@@ -98,18 +98,6 @@ __global int* calcTargetSpikesPtr(__global int* spikes, __global int* output,
     return output + (globalId - spikesNum); // if we're on output layer
 }
 
-
-void getSem(__global int* sem) {
-    int occupied = atom_xchg(sem, 1);
-    while(occupied > 0) {
-        occupied = atom_xchg(sem, 1);
-    }
-}
-
-void releaseSem(__global int* sem) {
-    int prevVal = atom_xchg(sem, 0);
-}
-
 __kernel void neuron(
         __global const int* layersSz,
         const int layersNum,
@@ -119,7 +107,7 @@ __kernel void neuron(
         __global const float* weights,
         __global int* spikes,
         float threshold,
-        __global int* t,
+        volatile __global int* t,
         __global int* sem,
         __global const float* input,
         __global int* output
@@ -134,13 +122,14 @@ __kernel void neuron(
     int i;
     int j;
     float pot = 0;
-    for (i = 0; i < DELTA_T; ++i) {
-        pot += calcRecievedpot(*t + i, weightsVec, inputSpikesVec, spikesPerSyn, synPerConn, layersSz[layerId - 1]);
-        if (pot > threshold) {
-            outputVec[j++] = t + i;
-            pot += refractoryFunc(i, threshold, 1.0); // i is current spike's time = (t+i) - t
+    while (*t < exitTime) {
+        for (i = 0; i < DELTA_T; ++i) {
+            pot += calcRecievedPot(weightsVec, inputSpikesVec, spikesPerSyn, synPerConn, layersSz[layerId - 1]);
+            if (pot > threshold) {
+                outputVec[j++] = t + i;
+                pot += refractoryFunc(i, threshold, 1.0); // i is current spike's time = (t+i) - t
+            }
         }
+        atomic_cmpxchg(t, *t + DELTA_T, *t + DELTA_T);
     }
-
-    // TODO synchronization
 }
