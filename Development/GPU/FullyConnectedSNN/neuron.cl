@@ -2,14 +2,6 @@
 
 #define DELTA_T 15
 
-inline float dotProduct(__global const float* a,  __global const float* b, size_t size) {
-    float res = 0;
-    for (size_t i = 0; i < size; ++i) {
-        res += a[i]*b[i];
-    }
-    return res;
-}
-
 inline float refractoryFunc(float t, float threshold, float tau) {
     if (t >= 0)
         return -threshold * native_exp(1 - 2 * t / tau);
@@ -22,49 +14,53 @@ inline float spikeFunc(float t, float tau) {
     return 0;
 }
 
-inline __local float* spikeFuncVect(__global const int* times, size_t size, float tau) {
-    int i;
-    /* FIX FIX FIX*/
-    __local float potentials[1000];
-    for (i = 0; i < size; ++i) {
-        potentials[i] = spikeFunc(times[i], tau);
-    }
-    return potentials;
-}
+float calcRecievedpot(int time, __global const float* weights, __global int* spikes,
+                      int spikesPerSyn, int synPerConn, size_t connNum) {
 
-int calculateSpikesNumber(__global const int* layersSizes, int layerNumber, int synapsesPerConnection, int spikesPerSynapse) {
-    int result = 0;
+    // FIX pot should be calcd dinamically
     int i;
-    for(i = 0; i < layerNumber; ++i) {
-        result += layersSizes[i] * synapsesPerConnection * spikesPerSynapse;
+    int j;
+    float result;
+    for (j = 0; j < connNum * synPerConn; ++j) {
+        for (i = 0; i < spikesPerSyn; ++i)
+            result += weights[j] * spikeFunc(spikes[j * spikesPerSyn + i], 1.0);
     }
     return result;
 }
 
-int calculateLayerId(__global const int* layerSizes, int globalId) {
+int calcSpikesNum(__global const int* layersSz, int layerNum, int synPerConn, int spikesPerSyn) {
+    int result = 0;
+    int i;
+    for(i = 0; i < layerNum; ++i) {
+        result += layersSz[i] * synPerConn * spikesPerSyn;
+    }
+    return result;
+}
+
+int calcLayerId(__global const int* layersSz, int globalId) {
     int result = 0;
     do {
-        globalId -= layerSizes[++result];
+        globalId -= layersSz[++result];
     } while (globalId >= 0);
     return result;
 }
 
-int calculateNeuronId(__global const int* layerSizes, int globalId, size_t layerId) {
+int calcNeuronId(__global const int* layersSz, int globalId, size_t layerId) {
     int i;
     for (i = 1; i < layerId; ++i) { // i = 1 or  i = 0??
-        globalId -= layerSizes[i];
+        globalId -= layersSz[i];
     }
     return globalId;
 }
 
-__global int* calculatePreviousLayerBeginning(__global const float* input, __global int* spikes,
-                                              __global const int* layerSizes, int layerId, const int synapsesPerConnection, const int spikesPerSynapse) {
+__global int* calcPrevLayerStart(__global const float* input, __global int* spikes,
+                                 __global const int* layersSz, int layerId, const int synPerConn, const int spikesPerSyn) {
     if (layerId == 1) {
         int i;
         int j;
-        size_t encodedInputSize = layerSizes[0] * synapsesPerConnection * spikesPerSynapse;
+        size_t encInputSize = layersSz[0] * synPerConn * spikesPerSyn;
         int freq = 0;
-        for (i = 0; i < encodedInputSize; i++) {
+        for (i = 0; i < encInputSize; i++) {
             freq += input[j++];
             if (freq / 1000 > 0) {
                 spikes[i++] = j;
@@ -75,26 +71,26 @@ __global int* calculatePreviousLayerBeginning(__global const float* input, __glo
     }
     int i;
     for (i = 1; i < layerId - 1; ++i) {
-        spikes += layerSizes[i] * synapsesPerConnection * spikesPerSynapse;
+        spikes += layersSz[i] * synPerConn * spikesPerSyn;
     }
     return spikes;
 }
 
-__global const float* calculateWeightsBeginning(__global const float* weights, __global const int* layerSizes,
-                                                const int synapsesPerConnection, int layerId, int neuronId) {
+__global const float* calcWeightsStart(__global const float* weights, __global const int* layersSz,
+                                       const int synPerConn, int layerId, int neuronId) {
     int i;
-    // skip all previous layers
+    // skip all Prev layers
     for (i = 0; i < layerId - 1; ++i) {
-        weights += layerSizes[i] * layerSizes[i + 1] * synapsesPerConnection;
+        weights += layersSz[i] * layersSz[i + 1] * synPerConn;
     }
 
     // skip all neurons on this layer
-    weights += (layerSizes[layerId - 1]) * synapsesPerConnection * neuronId;
+    weights += (layersSz[layerId - 1]) * synPerConn * neuronId;
     return weights;
 }
 
-__global int* calculateTargetSpikesPtr(__global int* spikes, __global int* output,
-                                       const int layersNum, const int spikesNum, const int layerId, const int globalId) {
+__global int* calcTargetSpikesPtr(__global int* spikes, __global int* output,
+                                  const int layersNum, const int spikesNum, const int layerId, const int globalId) {
     if (layerId < layersNum - 1) { // if we're on hidden layer
         __global int* result = spikes + globalId;
         return result;
@@ -103,22 +99,22 @@ __global int* calculateTargetSpikesPtr(__global int* spikes, __global int* outpu
 }
 
 
-void getSemaphor(__global int* semaphor) {
-    int occupied = atom_xchg(semaphor, 1);
+void getSem(__global int* sem) {
+    int occupied = atom_xchg(sem, 1);
     while(occupied > 0) {
-        occupied = atom_xchg(semaphor, 1);
+        occupied = atom_xchg(sem, 1);
     }
 }
 
-void releaseSemaphor(__global int* semaphor) {
-    int prevVal = atom_xchg(semaphor, 0);
+void releaseSem(__global int* sem) {
+    int prevVal = atom_xchg(sem, 0);
 }
 
 __kernel void neuron(
-        __global const int* layersSizes,
-        const int layersNumber,
-        int synapsesPerConnection,
-        int spikesPerSynapse,
+        __global const int* layersSz,
+        const int layersNum,
+        int synPerConn,
+        int spikesPerSyn,
         int exitTime,
         __global const float* weights,
         __global int* spikes,
@@ -129,22 +125,20 @@ __kernel void neuron(
         __global int* output
 ) {
     int globalId = get_global_id(0);
-    int layerId = calculateLayerId(layersSizes, globalId);
-    int neuronId = calculateNeuronId(layersSizes, globalId, layerId);
-    int spikesNumber = calculateSpikesNumber(layersSizes, layersNumber, synapsesPerConnection, spikesPerSynapse);
-    __global int* outputVector = calculateTargetSpikesPtr(spikes, output, layersNumber, spikesNumber, layerId, globalId);
-    __global const int* inputSpikes = calculatePreviousLayerBeginning(input, spikes, layersSizes, layerId, synapsesPerConnection, spikesPerSynapse);
+    int layerId = calcLayerId(layersSz, globalId);
+    int neuronId = calcNeuronId(layersSz, globalId, layerId);
+    int spikesNum = calcSpikesNum(layersSz, layersNum, synPerConn, spikesPerSyn);
+    __global int* outputVec = calcTargetSpikesPtr(spikes, output, layersNum, spikesNum, layerId, globalId);
+    __global const int* inputSpikesVec = calcPrevLayerStart(input, spikes, layersSz, layerId, synPerConn, spikesPerSyn);
+    __global const float* weightsVec = calcWeightsStart(weights, layersSz, synPerConn, layerId, neuronId);
     int i;
     int j;
-    float potential = 0;
+    float pot = 0;
     for (i = 0; i < DELTA_T; ++i) {
-        __global const float* weightsVector = calculateWeightsBeginning(weights, layersSizes, synapsesPerConnection, layerId, neuronId);
-        size_t inputSpikesSize = layersSizes[layerId - 1] * synapsesPerConnection * spikesPerSynapse;
-        potential += dotProduct(weightsVector, spikeFuncVect(inputSpikes, inputSpikesSize, 1), inputSpikesSize); // FIX: weights for connection, so each weight should be multiplyed to spikesPerCon
-
-        if (potential > threshold) {
-            outputVector[j++] = t + i;
-            potential += refractoryFunc(i, threshold, 1.0);
+        pot += calcRecievedpot(*t + i, weightsVec, inputSpikesVec, spikesPerSyn, synPerConn, layersSz[layerId - 1]);
+        if (pot > threshold) {
+            outputVec[j++] = t + i;
+            pot += refractoryFunc(i, threshold, 1.0); // i is current spike's time = (t+i) - t
         }
     }
 
