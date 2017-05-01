@@ -1,7 +1,7 @@
-#pragma OPENCL EXTENSION cl_khr_global_int32_base_atomics : enable
-
 #define DELTA_T 15
 #define SPIKES_SIZE 2048
+#define SPIKE_FUNCTION_PARAM 2.7
+#define REFRACTORY_FUNCTION_PARAM 20.0
 
 inline float refractoryFunc(float t, float threshold, float tau) {
     if (t >= 0)
@@ -17,12 +17,12 @@ inline float spikeFunc(float t, float tau) {
 
 void calcRecvPot(__private float* recvPot,__global const float* weights, __global const int* spikes,
                  int spikesPerSyn, int synPerConn, size_t connNum) {
-    // recivedPot is a precalculated hash-table [{spikeTime : its potential}, ...]
+    // recievedPot is a precalculated hash-table [{spikeId: its potential}, ...]
     int i;
     int j;
     for (j = 0; j < connNum * synPerConn; ++j) {
         for (i = 0; i < spikesPerSyn; ++i)
-            recvPot[spikes[j * spikesPerSyn + i]] += weights[j] * spikeFunc(spikes[j * spikesPerSyn + i], 1.0);
+            recvPot[i] += weights[j] * spikeFunc(spikes[j * spikesPerSyn + i], SPIKE_FUNCTION_PARAM);
     }
 }
 
@@ -45,7 +45,7 @@ int calcLayerId(__global const int* layersSz, int globalId) {
 
 int calcNeuronId(__global const int* layersSz, int globalId, size_t layerId) {
     int i;
-    for (i = 1; i < layerId; ++i) { // i = 1 or  i = 0??
+    for (i = 0; i < layerId; ++i) { // i = 1 or  i = 0??
         globalId -= layersSz[i];
     }
     return globalId;
@@ -112,26 +112,42 @@ __kernel void neuron(
     int globalId = get_global_id(0);
     int layerId = calcLayerId(layersSz, globalId);
     int neuronId = calcNeuronId(layersSz, globalId, layerId);
+    if (globalId == 0)
+        *t = 0;
+
     int spikesNum = calcSpikesNum(layersSz, layersNum, synPerConn, spikesPerSyn);
+
+    // spikes of current neuron
     __global int* outputVec = calcTargetSpikesPtr(spikes, output, layersNum, spikesNum, layerId, globalId);
+
+    // spikes of previous neuron
     __global const int* inputSpikesVec = calcPrevLayerStart(input, spikes, layersSz, layerId, synPerConn, spikesPerSyn);
+
     __global const float* weightsVec = calcWeightsStart(weights, layersSz, synPerConn, layerId, neuronId);
-    __private float spikePots[SPIKES_SIZE]; // FIX ME: should be __global argument
+
+    // precalculate potentials that produce each recieved spike
+    // on same layer this rule is always correct:
+    // i < j ==> spikes[i] < spikes[j] ==> pot. of spikes[i] is spikePot[i]
+    __private float spikePots[SPIKES_SIZE];
     int i;
     for(i = 0; i < SPIKES_SIZE; ++i)
         spikePots[i] = 0.0;
     calcRecvPot(spikePots, weightsVec, inputSpikesVec, spikesPerSyn, synPerConn, layersSz[layerId - 1]);
 
-    int j;
+    int j = 0;
+    int k = 0;
     float pot = 0;
     while (*t < exitTime) {
         for (i = 0; i < DELTA_T; ++i) {
-            pot += spikePots[*t+i]; // could be no spike in time (*t + i)
-            if (pot > threshold) {
+            if (spikePots[k] <= *t + i)
+                pot += spikePots[k++];
+            if (pot >= threshold) {
                 outputVec[j++] = *t + i;
-                pot += refractoryFunc(i, threshold, 1.0); // i is current spike's time = (*t+i) - *t
+                pot += refractoryFunc(*t + i - k, threshold, REFRACTORY_FUNCTION_PARAM);
             }
         }
-        atomic_cmpxchg(t, *t + DELTA_T, *t + DELTA_T);
+
+        if (globalId == 0)
+            *t += DELTA_T;
     }
 }
