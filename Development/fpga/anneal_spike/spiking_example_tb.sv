@@ -73,7 +73,7 @@ module example_tb;
     neuron1_in2 = 0;
     #20ns;
     rst = 0;
-    #390ns; // seems to be enough for everything to finish
+    #10000ns; // seems to be enough for everything to finish
     $display("SUCCESS");
     $stop;
   end

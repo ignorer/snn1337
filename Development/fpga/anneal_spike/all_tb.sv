@@ -6,6 +6,8 @@
 
 module all_tb;
   
+  parameter five = 5;
+  
   logic clk;
   logic rst;
   
@@ -19,7 +21,7 @@ module all_tb;
   reg signed[4:0] a;
   reg signed[7:0] b;
   reg signed[20:0] c;
-  reg [10:0] d;
+  reg [9:0] d;
  
   initial
   begin
@@ -29,6 +31,13 @@ module all_tb;
     c += a * b;
     $display(c);
     $display(a * b);
+    d = 1023;
+    $display("%b", d);
+    $display((d == -1));
+    d <<= 5;
+    $display("%b", d);
+    $display((d == -1));
+    
     // $display(c[0], c[1], c[2]);
   end;
   

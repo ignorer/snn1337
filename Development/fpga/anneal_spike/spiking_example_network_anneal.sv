@@ -13,10 +13,6 @@ module example_network_tb;
   
   parameter CMD_WIDTH = 3;
   parameter ADDR_WIDTH = 3;
-  
-  localparam CMD_SET_DELIVERY_TIME = (1 << CMD_WIDTH) - 1;
-  localparam CMD_SET_BIAS = (1 << CMD_WIDTH) - 2;
-  localparam CMD_CLEAR = (1 << CMD_WIDTH) - 3;
 
   logic clk;
   logic rst;
@@ -31,7 +27,7 @@ module example_network_tb;
   
   spiking_neural_network_xor #(
     .INT_WIDTH(INT_WIDTH),
-    .SILENT(1)
+    .SILENT(0)
   ) neural_network(
     .clk(clk),
     .rst(rst),
@@ -42,7 +38,7 @@ module example_network_tb;
     .out_time(neural_network_out_time)
   );
   
-  task run_cmd;
+  task set_weight;
     input [INT_MSB:0] addr_;
     input [INT_MSB:0] cmd_;
     input [FLOAT_WIDTH - 1:0] weight_; 
@@ -82,32 +78,18 @@ module example_network_tb;
       rst = 1;
       #20ns
       rst = 0;
-      run_cmd(1, 1, INT_MAX / 2.1);
-      run_cmd(1, 2, INT_MAX / 2.1);
-      run_cmd(2, 1, INT_MAX * 1.2);
-      run_cmd(2, 2, INT_MAX * 1.2);
-      run_cmd(4, 1, -INT_MAX);
-      run_cmd(4, 2, INT_MAX);
+      set_weight(1, 1, INT_MAX / 2.1);
+      set_weight(1, 2, INT_MAX / 2.1);
+      set_weight(2, 1, INT_MAX * 1.2);
+      set_weight(2, 2, INT_MAX * 1.2);
+      set_weight(3, 1, -INT_MAX);
+      set_weight(3, 2, INT_MAX);
       
-      run_cmd(3, CMD_SET_BIAS, INT_MAX);
-      run_cmd(3, CMD_SET_DELIVERY_TIME, 12);
-      
-      run_cmd(5, 1, INT_MAX * 0.6);
-      run_cmd(5, 2, -INT_MAX * 2);
-      
-      run_cmd(6, 1, INT_MAX);
-      run_cmd(6, 2, INT_MAX);
-      run_cmd(6, CMD_SET_DELIVERY_TIME, 2);
-    
-      run_cmd(7, 1, INT_MAX);
-      run_cmd(7, 2, INT_MAX);
-      run_cmd(7, CMD_SET_DELIVERY_TIME, 2);
-      
-      cmd = CMD_CLEAR;
-      #20ns;
       cmd = 0;
+      #20ns;
+      cmd = -1;
       
-      #700ns; // wait for calculations
+      #500ns; // wait for calculations
             
       `assert_equal(expected, neural_nework_out);
     end

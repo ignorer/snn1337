@@ -15,9 +15,13 @@ add wave -radix decimal /example_network_tb/neural_network/counter
 add wave -radix decimal /cmd
 add wave /example_network_tb/neural_network/neuron_0_1_out
 add wave /example_network_tb/neural_network/neuron_0_2_out
-add wave /example_network_tb/neural_network/neuron_1_1_out
-add wave /example_network_tb/neural_network/neuron_1_2_out
-add wave /example_network_tb/neural_network/neuron_2_1_out
+add wave /example_network_tb/neural_network/neuron_1_out
+add wave /example_network_tb/neural_network/neuron_2_out
+add wave /example_network_tb/neural_network/neuron_3_out
+add wave /example_network_tb/neural_network/neuron_4_out
+add wave /example_network_tb/neural_network/neuron_5_out
+add wave /example_network_tb/neural_network/neuron_6_out
+add wave /example_network_tb/neural_network/neuron_7_out
 
 configure wave -timelineunits ns
 run -all
