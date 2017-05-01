@@ -24,9 +24,7 @@ module example_tb;
   reg neuron1_in1, neuron1_in2, neuron1_out;
   
   spiking_neuron_2in #(
-    .NEURON_LEVEL(1),
     .NEURON_ID(1),
-    .NEURON_GLOBAL_ID(1),
     .SILENT(0),
     .INT_WIDTH(INT_WIDTH),
     .CMD_WIDTH(INT_WIDTH),
@@ -61,6 +59,7 @@ module example_tb;
       weight = weight_;
       #20ns;
       addr = -1;
+      cmd = 0;
     end
   endtask
  
@@ -84,6 +83,7 @@ module example_tb;
     #5ns;
     set_weight(1, 1, 7);
     set_weight(1, 2, 7); 
+    
   end
 
   initial 

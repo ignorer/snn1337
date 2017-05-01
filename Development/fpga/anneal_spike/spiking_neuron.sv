@@ -37,8 +37,8 @@ module spiking_neuron_2in(clk, rst, addr, cmd, cmd_arg, in1, in2, out);
   
   parameter CMD_WIDTH = 8;
   localparam CMD_MSB = CMD_WIDTH - 1;
-  localparam CMD_SET_DELIVERY_TIME = (1 << CMD_WIDTH) - 1;
-  localparam CMD_SET_BIAS = (1 << CMD_WIDTH) - 2;
+  localparam CMD_SET_DELIVERY_TIME = INPUTS_COUNT + 1;
+  localparam CMD_SET_BIAS = INPUTS_COUNT + 2;
   localparam CMD_CLEAR = (1 << CMD_WIDTH) - 3;
   
   // int and float[0; 1) width

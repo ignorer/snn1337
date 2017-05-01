@@ -5,7 +5,7 @@ It is a simple module that counts XOR function
 Uses neuron_example_simple inside
 */
 
-module spiking_neural_network_xor(clk, rst, addr, cmd, cmd_arg, in1, in2, out, out_time);
+module spiking_neural_network_xor(clk, rst, addr, cmd, cmd_arg, in, out);
   parameter INT_WIDTH = 4;
   parameter INT_MSB = INT_WIDTH - 1;
   parameter INT_MAX = (1 << INT_WIDTH) - 1;
@@ -15,8 +15,8 @@ module spiking_neural_network_xor(clk, rst, addr, cmd, cmd_arg, in1, in2, out, o
   
   parameter ADDR_WIDTH = 3;
   parameter CMD_WIDTH = 3;
-  localparam CMD_SET_DELIVERY_TIME = (1 << CMD_WIDTH) - 1;
-  localparam CMD_SET_BIAS = (1 << CMD_WIDTH) - 2;
+  localparam CMD_SET_DELIVERY_TIME = 2 + 1;
+  localparam CMD_SET_BIAS = 2 + 2;
   localparam CMD_CLEAR = (1 << CMD_WIDTH) - 3;
   
   parameter SILENT = 1;
@@ -27,11 +27,9 @@ module spiking_neural_network_xor(clk, rst, addr, cmd, cmd_arg, in1, in2, out, o
   input wire rst;
   wire neurons_rst;
   
-  input wire in1;
-  input wire in2;
+  input wire [2:1] in;
   
-  output reg out;
-  output reg [31:0] out_time;
+  output reg [1:1] out;
   
   input reg [ADDR_WIDTH - 1 : 0] addr;
   input reg [CMD_WIDTH - 1 : 0] cmd;
@@ -39,8 +37,7 @@ module spiking_neural_network_xor(clk, rst, addr, cmd, cmd_arg, in1, in2, out, o
   
   reg[31:0] counter;
   
-  reg neuron_0_1_out;
-  reg neuron_0_2_out;
+  reg [2:1] neuron_0_out;
     
   wire neuron_1_out;
   wire neuron_2_out;
@@ -54,13 +51,13 @@ module spiking_neural_network_xor(clk, rst, addr, cmd, cmd_arg, in1, in2, out, o
     .NEURON_ID(1), 
     .INT_WIDTH(INT_WIDTH), .ADDR_WIDTH(ADDR_WIDTH), .CMD_WIDTH(CMD_WIDTH), .SILENT(0 | SILENT)
   ) neuron_1(.clk(clk), .rst(rst), .addr(addr), .cmd(cmd), .cmd_arg(cmd_arg), 
-      .in1(neuron_0_1_out), .in2(neuron_0_2_out), .out(neuron_1_out));
+      .in1(neuron_0_out[1]), .in2(neuron_0_out[2]), .out(neuron_1_out));
   
   spiking_neuron_2in #(
     .NEURON_ID(2), 
     .INT_WIDTH(INT_WIDTH), .ADDR_WIDTH(ADDR_WIDTH), .CMD_WIDTH(CMD_WIDTH), .SILENT(0 | SILENT)
   ) neuron_2(.clk(clk), .rst(rst), .addr(addr), .cmd(cmd), .cmd_arg(cmd_arg), 
-      .in1(neuron_0_1_out), .in2(neuron_0_2_out), .out(neuron_2_out));
+      .in1(neuron_0_out[1]), .in2(neuron_0_out[2]), .out(neuron_2_out));
   
   spiking_neuron_2in #(
     .NEURON_ID(4), 
@@ -98,9 +95,7 @@ module spiking_neural_network_xor(clk, rst, addr, cmd, cmd_arg, in1, in2, out, o
     if (!SILENT) $display("Neural network started");
     counter = -1;
     out = 1'b z;
-    neuron_0_1_out = 0;
-    neuron_0_2_out = 0;
-    out_time = MAX_TIME;
+    neuron_0_out = 0;
   end
   
   always @(posedge clk)
@@ -111,7 +106,6 @@ module spiking_neural_network_xor(clk, rst, addr, cmd, cmd_arg, in1, in2, out, o
     begin
       counter = 0;
       out = 1'b z;
-      out_time = MAX_TIME;
     end
       
     if (cmd == 0)
@@ -120,21 +114,19 @@ module spiking_neural_network_xor(clk, rst, addr, cmd, cmd_arg, in1, in2, out, o
         0 : 
         begin
           if (!SILENT) $display("Neural network: Start argument pulses");
-          neuron_0_1_out = in1;
-          neuron_0_2_out = in2;
+          neuron_0_out = in;
         end
         1 : 
         begin
           if (!SILENT) $display("Neural network: Finish argument pulses");
-          neuron_0_1_out = 0;
-          neuron_0_2_out = 0;
+          neuron_0_out = 0;
         end  
         MAX_TIME :
         begin
+          
           if (out === 1'b z)
           begin
             out = 0;
-            out_time = counter + 10;
             counter = counter - 1;
           end
         end
@@ -142,7 +134,6 @@ module spiking_neural_network_xor(clk, rst, addr, cmd, cmd_arg, in1, in2, out, o
       if (out === 1'b z && (neuron_6_out || neuron_7_out))
       begin
         out = neuron_6_out ? 1 : 0;
-        out_time = counter;
       end
     counter = counter + 1;
     end    

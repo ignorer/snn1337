@@ -14,8 +14,9 @@ module anneal_spike_tb;
   parameter CMD_WIDTH = 3;
   parameter ADDR_WIDTH = 3;
   
-  localparam CMD_SET_DELIVERY_TIME = (1 << CMD_WIDTH) - 1;
-  localparam CMD_SET_BIAS = (1 << CMD_WIDTH) - 2;
+  
+  localparam CMD_SET_DELIVERY_TIME = 2 + 1;
+  localparam CMD_SET_BIAS = 2 + 2;
   localparam CMD_CLEAR = (1 << CMD_WIDTH) - 3;
 
   logic clk;
@@ -28,8 +29,7 @@ module anneal_spike_tb;
   reg neural_network_in1, neural_network_in2, neural_network_out;
   
   int neural_network_fitness;
-  
-  reg [31:0] neural_network_out_time;
+
   
   spiking_neural_network_xor #(
     .INT_WIDTH(INT_WIDTH),
@@ -38,10 +38,8 @@ module anneal_spike_tb;
     .clk(clk),
     .rst(rst),
     .addr(addr), .cmd(cmd), .cmd_arg(weight),
-    .in1(neural_network_in1),
-    .in2(neural_network_in2),
-    .out(neural_network_out),
-    .out_time(neural_network_out_time)
+    .in({neural_network_in1, neural_network_in2}),
+    .out(neural_network_out)
   );
   
   reg [19:0] rand_out;
@@ -158,7 +156,7 @@ module anneal_spike_tb;
    parameter FLOAT_BASE = (1 << 10);
    
     int neuron_id;
-    int neuron_in;
+    int neuron_cmd;
     int neuron_new_weight;
    int weights[1:7][1:2];
    int old_fitness, new_fitness, delta;
@@ -212,11 +210,24 @@ module anneal_spike_tb;
       begin
         neuron_id = (rand_out % 7) + 1;
         #20ns;
-        neuron_in = (rand_out % 2) + 1; 
+        neuron_cmd = (rand_out % (2 + 2)) + 1; 
         #20ns;
-        neuron_new_weight = (rand_out % (INT_MAX * 4)) - INT_MAX * 2; 
+       if (neuron_cmd <= 2)
+       begin
+          neuron_new_weight = (rand_out % (INT_MAX * 4)) - INT_MAX * 2;     
+       end
+       if (neuron_cmd == CMD_SET_BIAS)
+       begin
+          neuron_new_weight = (rand_out % (INT_MAX * 2)) - INT_MAX * 1;     
+       end
+       if (neuron_cmd == CMD_SET_DELIVERY_TIME)
+       begin
+          neuron_new_weight = (rand_out % 10);     
+       end
+       
+         
         #20ns;
-        run_cmd(neuron_id, neuron_in, neuron_new_weight);
+        run_cmd(neuron_id, neuron_cmd, neuron_new_weight);
         xor_net_fitness();
         new_fitness = neural_network_fitness * FLOAT_BASE;
         
@@ -231,10 +242,10 @@ module anneal_spike_tb;
           exp = 1 * FLOAT_BASE;
          exp_last_member = 1 * FLOAT_BASE;
          
-          if (exp_power < -10)
+          if (exp_power < -10 * FLOAT_BASE)
           begin
             exp = 0;
-           exp_last_member = 0;
+            exp_last_member = 0;
          end      
          for (int j = 1; j < 20; j++)
          begin
@@ -247,18 +258,18 @@ module anneal_spike_tb;
        end 
        if (accept_change)
        begin
-         weights[neuron_id][neuron_in] = neuron_new_weight;
+         weights[neuron_id][neuron_cmd] = neuron_new_weight;
          old_fitness = new_fitness;
        end
        else
         begin
-          run_cmd(neuron_id, neuron_in, weights[neuron_id][neuron_in]);
+          run_cmd(neuron_id, neuron_cmd, weights[neuron_id][neuron_cmd]);
           #20ns;
         end         
            
         
         //$display("run_cmd(%2d, %1d, %4d), new fitness = %1d",
-        //    neuron_id, neuron_in, neuron_new_weight, neural_network_fitness);
+        //    neuron_id, neuron_cmd, neuron_new_weight, neural_network_fitness);
         $display("%d iteration, fitness = %d, temperature = %d", i, old_fitness, temperature);
             
         if (i % 10 == 0)

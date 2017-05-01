@@ -3,7 +3,6 @@ transcript on
 vlib work
 
 vlog -sv +incdir+./ ./spiking_neuron.sv
-#vlog -sv +incdir+./ ./neural_network_simple_example.sv
 vlog -sv +incdir+./ ./spiking_example_tb.sv
 
 #vsim example_tb
