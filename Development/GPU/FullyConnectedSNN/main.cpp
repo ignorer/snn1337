@@ -42,7 +42,7 @@ typedef int size_type;
 using namespace std;
 
 ClStructHolder buildCLHolder(const char* kernelFileName, vector<float>& weights, vector<int> sizes,
-                               const char* functionName){
+                             const char* functionName){
     cl::Device defaultDevice = cl::Device::getDefault();
     cl::Context context(defaultDevice);
     cl::CommandQueue queue(context, defaultDevice);
@@ -101,7 +101,7 @@ void testNetworkTest() {
     vector<vector<int>> trainImagesData = ir.getTestImagesData();
     vector<vector<int>> inputs ;
     for(int i = 0; i < trainImagesData.size(); ++i) {
-         inputs.push_back(ir.getFrequencies(trainImagesData[i]));
+        inputs.push_back(ir.getFrequencies(trainImagesData[i]));
     }
 
     vector<size_type> layerSizes = network.getSizes();
@@ -113,8 +113,8 @@ void testNetworkTest() {
     vector<int> counters(layerSizes.begin(), layerSizes.end());
     vector<int> spikes;
     counters[0] = 0;
-    int* t = new int;
-    int* sem = new int;
+    vector<int> t(1);
+    vector<int> sem(1);
     float threshold = network.getThreshold();
     int synapsesPerConnection, spikesPerSynapse, exitTime;
     synapsesPerConnection = network.getSynapsesPerConnection();
@@ -126,21 +126,21 @@ void testNetworkTest() {
     }
     numberOfSpikes *= synapsesPerConnection*spikesPerSynapse;
     spikes.resize(numberOfSpikes, -100);
-    *t = 0;
-    *sem = accumulate(layerSizes.begin(), layerSizes.end(), 0);
 
     try {
         ClStructHolder holder = buildCLHolder("neuron.cl", weights, layerSizes, "neuron");
         cl::Buffer layersBuffer(holder.getContext(), layerSizes.begin(), layerSizes.end(), true);
         cl::Buffer weightsBuffer(holder.getContext(), weights.begin(), weights.end(), true);
+        cl::Buffer tBuffer(holder.getContext(), t.begin(), t.end(), true);
+        cl::Buffer semBuffer(holder.getContext(), sem.begin(), sem.end(), true);
         holder.getKernel().setArg(0, layersBuffer);
         holder.getKernel().setArg(2, synapsesPerConnection);
         holder.getKernel().setArg(3, spikesPerSynapse);
         holder.getKernel().setArg(4, exitTime);
         holder.getKernel().setArg(5, weightsBuffer);
         holder.getKernel().setArg(7, threshold);
-        holder.getKernel().setArg(8, t);
-        holder.getKernel().setArg(9, sem);
+        holder.getKernel().setArg(8, tBuffer);
+        holder.getKernel().setArg(9, semBuffer);
 
         auto start = chrono::steady_clock::now();
         for (size_t i = 0; i < inputs.size(); ++i) {
@@ -186,8 +186,8 @@ void testNetwork() {
     vector<int> counters(layerSizes.begin(), layerSizes.end());
     vector<int> spikes;
     counters[0] = 0;
-    int* t = new int;
-    int* sem = new int;
+    vector<int> t(1);
+    vector<int> sem(1);
     float threshold = network.getThreshold();
     int synapsesPerConnection, spikesPerSynapse, exitTime;
     synapsesPerConnection = network.getSynapsesPerConnection();
@@ -199,22 +199,22 @@ void testNetwork() {
     }
     numberOfSpikes *= synapsesPerConnection*spikesPerSynapse;
     spikes.resize(numberOfSpikes, -100);
-    *sem = accumulate(layerSizes.begin(), layerSizes.end(), 0);
-    *t = 0;
 
     try {
 
         ClStructHolder holder = buildCLHolder("neuron.cl", weights, layerSizes, "neuron");
         cl::Buffer layersBuffer(holder.getContext(), layerSizes.begin(), layerSizes.end(), true);
         cl::Buffer weightsBuffer(holder.getContext(), weights.begin(), weights.end(), true);
+        cl::Buffer tBuffer(holder.getContext(), t.begin(), t.end(), true);
+        cl::Buffer semBuffer(holder.getContext(), sem.begin(), sem.end(), true);
         holder.getKernel().setArg(0, layersBuffer);
         holder.getKernel().setArg(2, synapsesPerConnection);
         holder.getKernel().setArg(3, spikesPerSynapse);
         holder.getKernel().setArg(4, exitTime);
         holder.getKernel().setArg(5, weightsBuffer);
         holder.getKernel().setArg(7, threshold);
-        holder.getKernel().setArg(8, t);
-        holder.getKernel().setArg(9, sem);
+        holder.getKernel().setArg(8, tBuffer);
+        holder.getKernel().setArg(9, semBuffer);
 
 
         auto start = chrono::steady_clock::now();
