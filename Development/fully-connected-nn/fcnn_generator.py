@@ -2,7 +2,7 @@ import numpy as np
 
 
 class FCNNGenerator:
-    def __init__(self, bus_width=16, decimal_precision=3):
+    def __init__(self, bus_width=20, decimal_precision=4):
         self.bus_width = bus_width
         self.extended_width = bus_width * 2
         self.decimal_precision = decimal_precision
@@ -21,9 +21,11 @@ class FCNNGenerator:
         source += f'out{num_outputs - 1});\n\n'
 
         # parameters
+        for i in range(num_outputs):
+            source += f'parameter signed BIAS{i} = 0;\n'
         for i in range(num_inputs):
             for j in range(num_outputs):
-                source += f'parameter W{i}TO{j} = 0;\n'
+                source += f'parameter signed W{i}TO{j} = 0;\n'
         source += '\n'
 
         # ports definition
@@ -41,6 +43,7 @@ class FCNNGenerator:
         # neurons
         for i in range(num_outputs):
             source += f'neuron{num_inputs}in #('
+            source += f'.BIAS(BIAS{i}), '
             for j in range(num_inputs - 1):
                 source += f'.W{j}(W{j}TO{i}), '
             source += f'.W{num_inputs - 1}(W{num_inputs - 1}TO{i})) '
@@ -55,8 +58,10 @@ class FCNNGenerator:
         return self.layers[(num_inputs, num_outputs)]
 
     @staticmethod
-    def generate_parameter_pass(weight_matrix):
+    def generate_parameter_pass(weight_matrix, bias):
         source = '#('
+        for x in range(len(bias)):
+            source += f'.BIAS{x}({bias[x]}), '
         for x in range(weight_matrix.shape[0]):
             for y in range(weight_matrix.shape[1]):
                 if x == weight_matrix.shape[0] - 1 and y == weight_matrix.shape[1] - 1:
@@ -65,7 +70,7 @@ class FCNNGenerator:
                     source += f'.W{x}TO{y}({weight_matrix[x, y]}), '
         return source
 
-    def generate_network_module(self, weight_matrices):
+    def generate_network_module(self, weight_matrices, bias):
         layers_size = [weight_matrices[i].shape[1] for i in range(len(weight_matrices))]
         num_inputs = weight_matrices[0].shape[0]
         num_outputs = layers_size[-1]
@@ -98,7 +103,7 @@ class FCNNGenerator:
         self.generate_layer_module(num_inputs, layers_size[0])
         source += f'layer{num_inputs}in{layers_size[0]}out '
 
-        source += self.generate_parameter_pass(weight_matrices[0])
+        source += self.generate_parameter_pass(weight_matrices[0], bias[0])
         source += 'layer0(.clk(clk), .rst(rst), '
         for i in range(num_inputs):
             source += f'.in{i}(in{i}), '
@@ -120,7 +125,7 @@ class FCNNGenerator:
         for i in range(1, len(layers_size) - 1):
             self.generate_layer_module(layers_size[i - 1], layers_size[i])
             source += f'layer{layers_size[i - 1]}in{layers_size[i]}out '
-            source += self.generate_parameter_pass(weight_matrices[i])
+            source += self.generate_parameter_pass(weight_matrices[i], bias[i])
             source += f'layer{i}(.clk(clk), .rst(rst), '
             for j in range(layers_size[i - 1]):
                 source += f'.in{j}(con{i - 1}[{j}]), '
@@ -133,7 +138,7 @@ class FCNNGenerator:
             i = len(layers_size) - 1
             self.generate_layer_module(layers_size[i - 1], layers_size[i])
             source += f'layer{layers_size[i - 1]}in{layers_size[i]}out '
-            source += self.generate_parameter_pass(weight_matrices[-1])
+            source += self.generate_parameter_pass(weight_matrices[-1], bias[-1])
             source += f'layer{i}(.clk(clk), .rst(rst), '
             for j in range(layers_size[i - 1]):
                 source += f'.in{j}(con{i - 1}[{j}]), '
@@ -153,6 +158,35 @@ class FCNNGenerator:
     def get_decimal(self, num):
         return int(num * (10 ** self.decimal_precision) + 0.5)
 
+    def generate_sum(self, size):
+        res = ''
+        dec = ''
+        for i in range(0, size, 2):
+            dec += f'reg signed [{self.extended_width - 1}:0] sum_0_{i >> 1};\n'
+            res += f'    sum_0_{i >> 1} <= (in{i} * W{i} + {self.get_decimal(0.5)}) / {self.get_decimal(1)}'
+            if (i + 1 < size):
+                res += f' + (in{i + 1} * W{i + 1} + {self.get_decimal(0.5)}) / {self.get_decimal(1)}'
+                if (i + 2 == size):
+                    res += ' + BIAS;\n'
+                else:
+                    res += ';\n'
+            else:
+                res += f' + BIAS;\n'
+        step = 1
+        size = (size >> 1) + (size & 1)
+        while size > 1:
+            for i in range(0, size - 1, 2):
+                dec += f'reg signed [{self.extended_width - 1}:0] sum_{step}_{i >> 1};\n'
+                res += f'    sum_{step}_{i >> 1} <= sum_{step - 1}_{i} + sum_{step - 1}_{i + 1}'
+                if (size % 2 != 0 and i + 3 == size):
+                    res += f' + sum_{step - 1}_{i + 2};\n'
+                else:
+                    res += ';\n'
+            step += 1
+            size >>= 1
+        res += f'    x <= sum_{step - 1}_0;\n'
+        return [dec, res]
+
     def generate_neuron_module(self, num_inputs):
         if num_inputs in self.neurons:
             return self.neurons[num_inputs]
@@ -163,8 +197,9 @@ class FCNNGenerator:
         source += 'out);\n\n'
 
         # parameters
+        source += 'parameter signed BIAS = 0;\n'
         for i in range(num_inputs):
-            source += f'parameter W{i} = 0;\n'
+            source += f'parameter signed W{i} = 0;\n'
         source += '\n'
 
         # ports definition
@@ -178,22 +213,28 @@ class FCNNGenerator:
 
         # neuron logic
         source += f'reg signed [{self.extended_width - 1}:0] x;\n'
-        source += f'reg [{self.extended_width - 1}:0] abs_x;\n'
-        source += f'reg [{self.extended_width - 1}:0] y;\n'
-        source += 'always @* begin\n'
-        source += '    x = '
-        for i in range(num_inputs - 1):
-            source += f'in{i} * W{i} / {self.get_decimal(1)} + '
-        source += f'in{num_inputs - 1} * W{num_inputs - 1} / {self.get_decimal(1)};\n'
+        source += f'reg signed [{self.extended_width - 1}:0] abs_x;\n'
+        source += f'reg signed [{self.extended_width - 1}:0] y;\n'
+        if num_inputs >= 3:
+            sum = self.generate_sum(num_inputs)
+            source += sum[0]
+            source += 'always @* begin\n'
+            source += sum[1]
+        else:
+            source += 'always @* begin\n'
+            source += '    x = '
+            for i in range(num_inputs - 1):
+                source += f'(in{i} * W{i} + {self.get_decimal(0.5)}) / {self.get_decimal(1)} + '
+            source += f'(in{num_inputs - 1} * W{num_inputs - 1} + {self.get_decimal(0.5)}) / {self.get_decimal(1)} + BIAS;\n'
         source += '    abs_x = x < 0 ? -x : x;\n'
         source += f'    if (abs_x >= {self.get_decimal(5)}) y = {self.get_decimal(1)};\n'
         source += f'    else if (abs_x >= {self.get_decimal(2.375)}) y = {self.get_decimal(0.03125)} * abs_x /' \
                   f' {self.get_decimal(1)} + {self.get_decimal(0.84375)};\n'
         source += f'    else if (abs_x >= {self.get_decimal(1)}) y = {self.get_decimal(0.125)} * abs_x /' \
                   f' {self.get_decimal(1)} + {self.get_decimal(0.625)};\n'
-        source += f'    else if (abs_x >= 0) y = {self.get_decimal(0.25)} * abs_x /' \
+        source += f'    else y = {self.get_decimal(0.25)} * abs_x /' \
                   f' {self.get_decimal(1)} + {self.get_decimal(0.5)};\n'
-        source += '    out = y;\n'
+        source += f'    out = x < 0 ? {self.get_decimal(1)} - y : y;\n'
         source += 'end\n\n'
         source += 'endmodule\n\n'
         self.neurons[num_inputs] = source
@@ -215,3 +256,5 @@ if __name__ == '__main__':
             9, 10
         ]).reshape((2, 1)))
     ]
+    bias = [[1, 2], [3, 4], [5]]
+    print(generator.generate_network_module(weights, bias))

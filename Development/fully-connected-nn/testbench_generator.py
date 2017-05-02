@@ -4,29 +4,29 @@ import numpy as np
 
 
 class FCNNTestbenchGenerator:
-    def __init__(self, bus_width=16, decimal_precision=3, eps=0.1, seed=1337):
+    def __init__(self, network, bus_width=20, decimal_precision=3, eps=0.01, seed=1337):
+        self.network = network
         self.bus_width = bus_width
         self.decimal_precision = decimal_precision
         self.eps = eps
         self.seed = seed
 
-    def generate_testbench(self, layer_sizes, test_count):
-        fcnn = network_generator.FCNN(layer_sizes, self.seed, network_generator.fpga_sigmoid)
-        fpga_net = fcnn.get_fpga_network(self.decimal_precision)
+    def generate_testbench(self, inputs):
+        layer_sizes = self.network.get_layer_sizes()
+        weights = self.network.get_fpga_weights(self.decimal_precision)
+        bias = self.network.get_fpga_bias(self.decimal_precision)
 
-        inputs = [np.random.randint(0, 2, layer_sizes[0]).astype(float) for _ in range(0, test_count)]
-        results = [fcnn.predict(input) for input in inputs]
+        outputs = [self.network.predict(input)[-1] for input in inputs]
 
         code_gen = code_generator.FCNNGenerator(self.bus_width, self.decimal_precision)
 
         # start generating code
-        source = code_gen.generate_network_module(fpga_net)
+        source = code_gen.generate_network_module(weights, bias)
 
         # assert
         source += '\n`define assert_close(expected, got, eps) \\\n'
         source += 'if ((expected > got && expected > got + eps) || (expected < got && expected + eps < got)) begin \\\n'
         source += '    $display("TEST FAILED in %m: got %d, expected %d", got, expected); \\\n'
-        source += '    $stop; \\\n'
         source += 'end\n\n'
 
         # testbench
@@ -35,9 +35,11 @@ class FCNNTestbenchGenerator:
         source += 'logic rst;\n'
 
         # inputs/outputs
-        source += f'\nreg [{self.bus_width - 1}:0] '
-        for i in range(0, layer_sizes[0]):
+        source += f'\nreg signed [{self.bus_width - 1}:0] '
+        for i in range(0, layer_sizes[0] - 1):
             source += f'net_in{i}, '
+        source += f'net_in{layer_sizes[0] - 1};\n'
+        source += f'\nwire signed [{self.bus_width - 1}:0] '
         for i in range(0, layer_sizes[-1] - 1):
             source += f'net_out{i}, '
         source += f'net_out{layer_sizes[-1] - 1};\n'
@@ -52,7 +54,7 @@ class FCNNTestbenchGenerator:
 
         # test
         source += '\ntask test;\n'
-        source += f'input [{self.bus_width - 1}:0] '
+        source += f'input signed [{self.bus_width - 1}:0] '
         for i in range(0, layer_sizes[0]):
             source += f'in{i}, '
         for i in range(0, layer_sizes[-1] - 1):
@@ -60,8 +62,8 @@ class FCNNTestbenchGenerator:
         source += f'out{layer_sizes[-1] - 1};\n'
         source += 'begin\n'
         for i in range(0, layer_sizes[0]):
-            source += f'    net_in{i} = in{i};\n'
-        source += '    #1000ns\n'
+            source += f'    net_in{i} <= in{i};\n'
+        source += '    #10000ns\n'
 
         for i in range(0, layer_sizes[-1]):
             source += f'    `assert_close(out{i}, net_out{i}, {int(self.eps * (10 ** self.decimal_precision))});\n'
@@ -71,13 +73,16 @@ class FCNNTestbenchGenerator:
         # run all tests
         source += '\ninitial\n'
         source += 'begin\n'
-        for i in range(0, test_count):
+        source += '    $dumpfile("waves.vcd");\n'
+        source += '    $dumpvars;\n'
+        for i in range(0, len(outputs)):
             source += '    test('
             for j in range(0, layer_sizes[0]):
                 source += f'{int(inputs[i][j] * (10 ** self.decimal_precision))}, '
             for j in range(0, layer_sizes[-1] - 1):
-                source += f'{int(results[i][j][0] * (10 ** self.decimal_precision) + 0.5)}, '
-            source += f'{int(results[i][layer_sizes[-1] - 1][0] * (10 ** self.decimal_precision) + 0.5)});\n'
+                source += f'{int(outputs[i][j] * (10 ** self.decimal_precision) + 0.5)}, '
+            source += f'{int(outputs[i][layer_sizes[-1] - 1] * (10 ** self.decimal_precision) + 0.5)});\n'
+            source += f'    $display("Test{i} completed");\n'
         source += '    $display("SUCCESS!");\n'
         source += 'end\n'
         source += 'endmodule\n'
@@ -85,8 +90,11 @@ class FCNNTestbenchGenerator:
 
 
 if __name__ == '__main__':
-    testbench_generator = FCNNTestbenchGenerator()
-    output = testbench_generator.generate_testbench([2, 4, 2, 2], 10)
+    fcnn = network_generator.get_random_network([65, 64, 1])
+    generator = FCNNTestbenchGenerator(fcnn, 16, 3)
+    test_count = 100
+    inputs = [np.random.randint(0, 2, 65).astype(float) for _ in range(0, test_count)]
+    output = generator.generate_testbench(inputs)
     with open('fcnn_testbench.sv', 'w') as output_file:
         output_file.write(output)
     print(output)
