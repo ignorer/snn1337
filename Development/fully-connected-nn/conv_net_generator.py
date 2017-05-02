@@ -59,7 +59,7 @@ class FullyConnectedLayer(Layer):
         self.bias = bias
 
 class FPGANetworkGenerator:
-    def __init__(self, bus_width=20, decimal_precision=4):
+    def __init__(self, bus_width=20, decimal_precision=3):
         self.bus_width = bus_width
         self.extended_width = bus_width * 2
         self.decimal_precision = decimal_precision
@@ -167,7 +167,7 @@ class FPGANetworkGenerator:
                 for k in range(height):
                     source += f'parameter signed W_{i}_{j}_{k} = {self.get_decimal(weights[i][j][k])};\n'
             if bias is not None:
-                source += f'parameter signed BIAS_{i} = {bias[i]};\n'
+                source += f'parameter signed BIAS_{i} = {self.get_decimal(bias[i])};\n'
 
         functions = []
         for i in range(depth):
@@ -321,6 +321,71 @@ class FPGANetworkGenerator:
         self.add_module(id, source)
         return source
 
+    def generate_testbench(self, layers, inputs):
+        source = '//--------------------------------------------------------------------------\n'
+        source += 'module example_tb;\n'
+        source += 'logic clk;\n'
+        source += 'logic rst;\n'
+
+        inDepth = layers[0].inDepth
+        inWidth = layers[0].inWidth
+        inHeight = layers[0].inHeight
+        outDepth = layers[-1].outDepth
+        outWidth = layers[-1].outWidth
+        outHeight = layers[-1].outHeight
+
+        source += self.generate_params(inDepth, inWidth, inHeight, f'reg signed [{self.bus_width - 1}:0] in', ';\n')
+        source += self.generate_params(outDepth, outWidth, outHeight, f'wire signed [{self.bus_width - 1}:0] out', ';\n')
+
+        # network
+        source += '\nnetwork net(.clk(clk), .rst(rst)'
+        in_fun = lambda x, y, z: f'in_{x}_{y}_{z}'
+        out_fun = lambda x, y, z: f'out_{x}_{y}_{z}'
+        source += self.generate_params_pass(inDepth, inWidth, inHeight, 0, 0, 0, in_fun, in_fun)
+        source += self.generate_params_pass(outDepth, outWidth, outHeight, 0, 0, 0, out_fun, out_fun)
+        source += ');\n\n'
+
+        # test
+        source += '\ntask test;\n'
+        source += f'input signed [{self.bus_width - 1}:0] '
+        source += self.generate_params(inDepth, inWidth, inHeight, 'test_in', ', ')
+        #source += self.generate_params(outDepth, outWidth, outHeight, 'test_out', ', ')
+        source += ' test_num;\n'
+
+        source += 'begin\n'
+        source += '$display("Test %d started", test_num);\n'
+        for i in range(inDepth):
+            for j in range(inWidth):
+                for k in range(inHeight):
+                    source += f'    in_{i}_{j}_{k} <= test_in_{i}_{j}_{k};\n'
+        source += '    #100000ns\n'
+
+        for i in range(outDepth):
+            for j in range(outWidth):
+                for k in range(outHeight):
+                    source += f'    $display(out_{i}_{j}_{k});\n'
+
+        source += 'end\n'
+        source += 'endtask\n'
+
+        # run all tests
+        source += '\ninitial\n'
+        source += 'begin\n'
+        source += '    $dumpfile("waves.vcd");\n'
+        source += '    $dumpvars;\n'
+        for num in range(0, len(inputs)):
+            source += '    test('
+            for i in range(inDepth):
+                for j in range(inWidth):
+                    for k in range(inHeight):
+                        source += f'{self.get_decimal(inputs[num][i][j][k])}, '
+            source += f'{num});\n'
+        source += '    $display("SUCCESS!");\n'
+        source += 'end\n'
+        source += 'endmodule\n\n'
+        self.add_module('testbench', source)
+        return source
+
     def get_source(self):
         source = ''
         for module in self.modules.values():
@@ -330,12 +395,15 @@ class FPGANetworkGenerator:
 if __name__ == '__main__':
     generator = FPGANetworkGenerator()
 
-    conv = ConvolutionalLayer(0, np.array([0, 1, 1, 0]).reshape(1, 2, 2), np.array([1]))
+    conv = ConvolutionalLayer(0, np.random.random((1, 2, 2)), np.random.random((1)))
     maxpool = MaxpoolLayer(1, 1, 2, 2, 1, 1)
     dense_conv = DenseLayer(2, 1, 4, 4, [conv], 1, 1)
     dense_max = DenseLayer(3, 1, 3, 3, [maxpool], 1, 1)
     activation = ActivationLayer(4, 1, 2, 2, ActivationFunctionType.NON_SATURATING)
-    fc = FullyConnectedLayer(5, np.array([1, 1, 1, 1]).reshape(1, 2, 2, 1, 1, 1))
+    fc = FullyConnectedLayer(5, np.random.random((1, 2, 2, 1, 1, 1)))
 
-    generator.generate_network([dense_conv, dense_max, activation, fc])
+    layers = [dense_conv, dense_max, activation, fc]
+
+    generator.generate_network(layers)
+    generator.generate_testbench(layers, np.random.random((100, 1, 4, 4)))
     print(generator.get_source())
