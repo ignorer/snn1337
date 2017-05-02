@@ -59,17 +59,18 @@ class FullyConnectedLayer(Layer):
         self.bias = bias
 
 class FPGANetworkGenerator:
-    def __init__(self, bus_width=20, decimal_precision=3):
-        self.bus_width = bus_width
-        self.extended_width = bus_width * 2
-        self.decimal_precision = decimal_precision
+    def __init__(self, busWidth=20, decimalPrecision=3, eps=0.1):
+        self.busWidth = busWidth
+        self.extendedWidth = busWidth * 2
+        self.decimalPrecision = decimalPrecision
+        self.eps = eps
         self.modules = {}
 
     def add_module(self, id, source):
         self.modules[id] = source
 
     def get_decimal(self, num):
-        return int(num * (10 ** self.decimal_precision) + 0.5)
+        return int(num * (10 ** self.decimalPrecision) + 0.5)
 
     @staticmethod
     def generate_params(depth, width, height, prefix, suffix = ''):
@@ -98,9 +99,9 @@ class FPGANetworkGenerator:
         source += 'input wire clk;\n'
         source += 'input wire rst;\n\n'
 
-        source += self.generate_params(inDepth, inWidth, inHeight, f'input signed [{self.bus_width - 1}:0] in', ';\n')
+        source += self.generate_params(inDepth, inWidth, inHeight, f'input signed [{self.busWidth - 1}:0] in', ';\n')
         source += '\n'
-        source += self.generate_params(outDepth, outWidth, outHeight, f'output {reg} signed [{self.bus_width - 1}:0] out', ';\n')
+        source += self.generate_params(outDepth, outWidth, outHeight, f'output {reg} signed [{self.busWidth - 1}:0] out', ';\n')
         source += '\n'
         return source
 
@@ -143,7 +144,7 @@ class FPGANetworkGenerator:
 
         newFunctions = []
         for i in range(0, size - 1, 2):
-            dec += f'reg signed [{self.bus_width - 1}:0] fun_{step}_{i >> 1};\n'
+            dec += f'reg signed [{self.busWidth - 1}:0] fun_{step}_{i >> 1};\n'
             out = call(functions[i], functions[i + 1])
             res += f'    fun_{step}_{i >> 1} <= '
             if (size % 2 != 0 and i + 3 == size):
@@ -203,8 +204,8 @@ class FPGANetworkGenerator:
         return source
 
     def generate_sigmoid_approximation(self):
-        source =  f'reg signed [{self.extended_width - 1}:0] abs_x;\n'
-        source += f'reg signed [{self.extended_width - 1}:0] y;\n'
+        source =  f'reg signed [{self.extendedWidth - 1}:0] abs_x;\n'
+        source += f'reg signed [{self.extendedWidth - 1}:0] y;\n'
         source += f'always @* begin\n'
         source += f'    abs_x = in_0_0_0 < 0 ? -in_0_0_0 : in_0_0_0;\n'
         source += f'    if (abs_x >= {self.get_decimal(5)}) y = {self.get_decimal(1)};\n'
@@ -231,17 +232,17 @@ class FPGANetworkGenerator:
         self.add_module(id, source)
         return source
 
-    def generate_activation(self, id, depth, width, height, activation_function_type):
+    def generate_activation(self, id, depth, width, height, activationFunctionType):
         source = self.generate_module_header(f'activation_{id}', depth, width, height, depth, width, height)
-        neuron_id = f'fun{int(activation_function_type)}'
-        neuron_function = self.generate_sigmoid_approximation
-        if activation_function_type == ActivationFunctionType.NON_SATURATING:
+        neuronId = f'fun{int(activationFunctionType)}'
+        neuronFunction = self.generate_sigmoid_approximation
+        if activationFunctionType == ActivationFunctionType.NON_SATURATING:
             neuron_function = self.generate_non_saturating
         for i in range(depth):
             for j in range(width):
                 for k in range(height):
-                    self.generate_neuron(neuron_id, neuron_function)
-                    source += self.generate_module_include(f'neuron_{neuron_id} neuron_{i}_{j}_{k}',
+                    self.generate_neuron(neuronId, neuronFunction)
+                    source += self.generate_module_include(f'neuron_{neuronId} neuron_{i}_{j}_{k}',
                                                            1, 1, 1, i, j, k, i, j, k)
         source += '\nendmodule\n\n'
         self.add_module(id, source)
@@ -259,12 +260,12 @@ class FPGANetworkGenerator:
         for i in range(outDepth):
             for j in range(outWidth):
                 for k in range(outHeight):
-                    conv_id = f'fc_{id}_{i}_{j}_{k}'
-                    conv_bias = None
+                    convId = f'fc_{id}_{i}_{j}_{k}'
+                    convBias = None
                     if bias is not None:
-                        conv_bias = bias[:, i, j, k]
-                    self.generate_convolutional_layer(conv_id, weights[:, :, :, i, j, k], conv_bias)
-                    source += self.generate_module_include(f'convolutional_{conv_id} connections_{i}_{j}_{k}',
+                        convBias = bias[:, i, j, k]
+                    self.generate_convolutional_layer(convId, weights[:, :, :, i, j, k], convBias)
+                    source += self.generate_module_include(f'convolutional_{convId} connections_{i}_{j}_{k}',
                                                            inDepth, inWidth, inHeight, 0, 0, 0, i, j, k)
         source += '\nendmodule\n\n'
         self.add_module(id, source)
@@ -310,7 +311,7 @@ class FPGANetworkGenerator:
                                              layers[-1].outDepth, layers[-1].outWidth, layers[-1].outHeight)
 
         for i in range(len(layers) - 1):
-            source += f'wire [{self.bus_width - 1}:0] con_{i}[{layers[i].outDepth}][{layers[i].outWidth}][{layers[i].outHeight}];\n'
+            source += f'wire [{self.busWidth - 1}:0] con_{i}[{layers[i].outDepth}][{layers[i].outWidth}][{layers[i].outHeight}];\n'
 
         source += '\n'
 
@@ -321,8 +322,12 @@ class FPGANetworkGenerator:
         self.add_module(id, source)
         return source
 
-    def generate_testbench(self, layers, inputs):
-        source = '//--------------------------------------------------------------------------\n'
+    def generate_testbench(self, layers, inputs, outputs = None):
+        source =  '\n`define assert_close(expected, got, eps) \\\n'
+        source += '$display("TEST in %m: got %d, expected %d", got, expected); \\\n'
+        source += 'if ((expected > got && expected > got + eps) || (expected < got && expected + eps < got)) begin \\\n'
+        source += '    $stop; \\\n'
+        source += 'end\n\n'
         source += 'module example_tb;\n'
         source += 'logic clk;\n'
         source += 'logic rst;\n'
@@ -334,8 +339,8 @@ class FPGANetworkGenerator:
         outWidth = layers[-1].outWidth
         outHeight = layers[-1].outHeight
 
-        source += self.generate_params(inDepth, inWidth, inHeight, f'reg signed [{self.bus_width - 1}:0] in', ';\n')
-        source += self.generate_params(outDepth, outWidth, outHeight, f'wire signed [{self.bus_width - 1}:0] out', ';\n')
+        source += self.generate_params(inDepth, inWidth, inHeight, f'reg signed [{self.busWidth - 1}:0] in', ';\n')
+        source += self.generate_params(outDepth, outWidth, outHeight, f'wire signed [{self.busWidth - 1}:0] out', ';\n')
 
         # network
         source += '\nnetwork net(.clk(clk), .rst(rst)'
@@ -347,9 +352,10 @@ class FPGANetworkGenerator:
 
         # test
         source += '\ntask test;\n'
-        source += f'input signed [{self.bus_width - 1}:0] '
+        source += f'input signed [{self.busWidth - 1}:0] '
         source += self.generate_params(inDepth, inWidth, inHeight, 'test_in', ', ')
-        #source += self.generate_params(outDepth, outWidth, outHeight, 'test_out', ', ')
+        if outputs is not None:
+            source += self.generate_params(outDepth, outWidth, outHeight, 'test_out', ', ')
         source += ' test_num;\n'
 
         source += 'begin\n'
@@ -358,12 +364,15 @@ class FPGANetworkGenerator:
             for j in range(inWidth):
                 for k in range(inHeight):
                     source += f'    in_{i}_{j}_{k} <= test_in_{i}_{j}_{k};\n'
-        source += '    #100000ns\n'
+        source += '    #1000000000ns\n'
 
         for i in range(outDepth):
             for j in range(outWidth):
                 for k in range(outHeight):
-                    source += f'    $display(out_{i}_{j}_{k});\n'
+                    if outputs is None:
+                        source += f'    $display(out_{i}_{j}_{k});\n'
+                    else:
+                        source += f'    `assert_close(test_out_{i}_{j}_{k}, out_{i}_{j}_{k}, {int(self.eps * (10 ** self.decimalPrecision))});\n'
 
         source += 'end\n'
         source += 'endtask\n'
@@ -379,6 +388,11 @@ class FPGANetworkGenerator:
                 for j in range(inWidth):
                     for k in range(inHeight):
                         source += f'{self.get_decimal(inputs[num][i][j][k])}, '
+            if outputs is not None:
+                for i in range(outDepth):
+                    for j in range(outWidth):
+                        for k in range(outHeight):
+                            source += f'{self.get_decimal(outputs[num][i][j][k])}, '
             source += f'{num});\n'
         source += '    $display("SUCCESS!");\n'
         source += 'end\n'
@@ -397,12 +411,12 @@ if __name__ == '__main__':
 
     conv = ConvolutionalLayer(0, np.random.random((1, 2, 2)), np.random.random((1)))
     maxpool = MaxpoolLayer(1, 1, 2, 2, 1, 1)
-    dense_conv = DenseLayer(2, 1, 4, 4, [conv], 1, 1)
-    dense_max = DenseLayer(3, 1, 3, 3, [maxpool], 1, 1)
+    denseConv = DenseLayer(2, 1, 4, 4, [conv], 1, 1)
+    denseMax = DenseLayer(3, 1, 3, 3, [maxpool], 1, 1)
     activation = ActivationLayer(4, 1, 2, 2, ActivationFunctionType.NON_SATURATING)
     fc = FullyConnectedLayer(5, np.random.random((1, 2, 2, 1, 1, 1)))
 
-    layers = [dense_conv, dense_max, activation, fc]
+    layers = [denseConv, denseMax, activation, fc]
 
     generator.generate_network(layers)
     generator.generate_testbench(layers, np.random.random((100, 1, 4, 4)))
