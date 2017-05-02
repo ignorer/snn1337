@@ -1,7 +1,7 @@
 import numpy as np
-from enum import Enum
+from enum import Enum, IntEnum
 
-class ActivationFunctionType(Enum):
+class ActivationFunctionType(IntEnum):
     SIGMOID_APPROXIMATION = 0
     NON_SATURATING = 1
 
@@ -123,7 +123,7 @@ class FPGANetworkGenerator:
                 for k in range(0, outHeight, stepY):
                     filter_name = f'convolutional_{filters[i].id} filter_{i}_{j}_{k}'
                     if filters[i].type == LayerType.MAXPOOL:
-                        self.generate_maxpool_layer(filters[i].id, filters[i].depth, filters[i].width, filters[i].height)
+                        self.generate_maxpool_layer(filters[i].id, filters[i].inDepth, filters[i].inWidth, filters[i].inHeight)
                         filter_name = f'maxpool_{filters[i].id} filter_{i}_{j}_{k}'
                     else:
                         self.generate_convolutional_layer(filters[i].id, filters[i].weights, filters[i].bias)
@@ -192,7 +192,7 @@ class FPGANetworkGenerator:
         for i in range(depth):
             for j in range(width):
                 for k in range(height):
-                    functions.append(f'in{i}_{j}_{k}')
+                    functions.append(f'in_{i}_{j}_{k}')
 
         tmp = self.generate_pool('out_0_0_0', functions, lambda x, y: f'({x} > {y} ? {x} : {y})')
         source += tmp[1]
@@ -233,7 +233,7 @@ class FPGANetworkGenerator:
 
     def generate_activation(self, id, depth, width, height, activation_function_type):
         source = self.generate_module_header(f'activation_{id}', depth, width, height, depth, width, height)
-        neuron_id = int(activation_function_type)
+        neuron_id = f'fun{int(activation_function_type)}'
         neuron_function = self.generate_sigmoid_approximation
         if activation_function_type == ActivationFunctionType.NON_SATURATING:
             neuron_function = self.generate_non_saturating
@@ -327,11 +327,15 @@ class FPGANetworkGenerator:
             source += module
         return source
 
-generator = FPGANetworkGenerator()
+if __name__ == '__main__':
+    generator = FPGANetworkGenerator()
 
-conv = ConvolutionalLayer(0, np.array([0, 1, 0, 0, 1, 0, 0, 1, 0]).reshape(1, 3, 3))
-dense = DenseLayer(1, 1, 4, 4, [conv], 1, 1)
-fc = FullyConnectedLayer(2, np.array([1, 1, 1, 1]).reshape(1, 2, 2, 1, 1, 1))
+    conv = ConvolutionalLayer(0, np.array([0, 1, 1, 0]).reshape(1, 2, 2), np.array([1]))
+    maxpool = MaxpoolLayer(1, 1, 2, 2, 1, 1)
+    dense_conv = DenseLayer(2, 1, 4, 4, [conv], 1, 1)
+    dense_max = DenseLayer(3, 1, 3, 3, [maxpool], 1, 1)
+    activation = ActivationLayer(4, 1, 2, 2, ActivationFunctionType.NON_SATURATING)
+    fc = FullyConnectedLayer(5, np.array([1, 1, 1, 1]).reshape(1, 2, 2, 1, 1, 1))
 
-generator.generate_network([dense, fc])
-print(generator.get_source())
+    generator.generate_network([dense_conv, dense_max, activation, fc])
+    print(generator.get_source())
