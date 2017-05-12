@@ -1,0 +1,136 @@
+/*
+Module spiking_neural_network_xor
+
+It is a simple module that counts XOR function
+Uses neuron_example_simple inside
+*/
+
+__PYTHON_PASTE__"module %s(" % NET_MODULE_NAME
+    clk, rst, addr, cmd, cmd_arg, in, out);
+    
+  parameter INT_WIDTH = 8;
+  parameter INT_MSB = INT_WIDTH - 1;
+  parameter INT_MAX = (1 << INT_WIDTH) - 1;
+  parameter WEIGHT_ONE = (1 << INT_WIDTH);
+  
+  parameter FLOAT_WIDTH = INT_WIDTH * 2;
+  
+  parameter ADDR_WIDTH = 8;
+  parameter CMD_WIDTH = 8;
+  
+  localparam NEURON_INPUTS_COUNT = 
+    __PYTHON_PASTE__"    " + str(INPUTS_COUNT) + ";"
+  localparam CMD_SET_DELIVERY_TIME = NEURON_INPUTS_COUNT + 1;
+  localparam CMD_SET_BIAS = NEURON_INPUTS_COUNT + 2;
+  localparam CMD_CLEAR = (1 << CMD_WIDTH) - 3;
+  
+  parameter SILENT = 1;
+  
+  parameter MAX_TIME = 35;
+  
+  localparam INPUTS_COUNT = NEURON_INPUTS_COUNT;
+  localparam OUTPUTS_COUNT = 
+    __PYTHON_PASTE__"    " + str(OUTPUTS_COUNT) + ";"
+  localparam OUTPUT_NEURONS_COUNT = OUTPUTS_COUNT * 2;
+  
+  input wire clk;
+  input wire rst;
+  wire neurons_rst;
+  
+  input wire [1:INPUTS_COUNT] in;
+  
+  output reg [0:OUTPUTS_COUNT] out;
+  
+  input reg [ADDR_WIDTH - 1 : 0] addr;
+  input reg [CMD_WIDTH - 1 : 0] cmd;
+  input reg [FLOAT_WIDTH - 1 : 0] cmd_arg;
+  
+  reg[31:0] counter;
+  
+  reg [1:INPUTS_COUNT] inputs_level;
+  reg [1:OUTPUT_NEURONS_COUNT] outputs_level;
+  
+
+  __PYTHON_PASTE__"\n".join(["  let neuron_i%d_out = inputs_level[%d];" % (i, i) for i in range(1, INPUTS_COUNT + 1)])  
+  __PYTHON_PASTE__"\n".join(["  wire neuron_%d_out;" % i for i in range(1, NEURONS_COUNT - 2 * OUTPUTS_COUNT + 1)])
+  __PYTHON_PASTE__"\n".join(["  let neuron_%d_out = outputs_level[%d];" % (NEURONS_COUNT - 2 * OUTPUTS_COUNT + i, i) for i in range(1, 2 * OUTPUTS_COUNT + 1)])
+
+
+__PYTHON_EXEC_BEGIN__
+
+def gen_neuron_declaration(neuron_id, inputs):
+    template = """\
+  // %d neuron, inputs=%s  
+  spiking_neuron_%din #(
+    .NEURON_ID(%d), 
+    .INT_WIDTH(INT_WIDTH), .ADDR_WIDTH(ADDR_WIDTH), .CMD_WIDTH(CMD_WIDTH), .SILENT(0 | SILENT)
+  ) neuron_%d(.clk(clk), .rst(rst), .addr(addr), .cmd(cmd), .cmd_arg(cmd_arg), 
+      %s, .out(neuron_%s_out));
+
+"""
+    ins = ", ".join([".in%d(neuron_%s_out)" % 
+            (i + 1, str(inp)) for i, inp in enumerate(inputs)])
+    return template % (neuron_id, str(inputs), len(inputs), 
+            neuron_id, neuron_id, ins, neuron_id)
+    
+TEMPLATE_LOCALS.gen_neuron_declaration = gen_neuron_declaration
+    
+GENERATE_NEURONS()
+
+__PYTHON_EXEC_END__
+  
+  always @(posedge rst)
+  begin
+    counter = -1;
+    for (int i = 0; i <= OUTPUTS_COUNT; i++)
+      out[i] = 1'b z;
+    inputs_level = 0;
+  end
+  
+  reg out_ready;
+  
+  always @(posedge clk)
+  begin
+    if (cmd == CMD_CLEAR)
+    begin
+      counter = 0;
+      for (int i = 0; i <= OUTPUTS_COUNT; i++)
+        out[i] = 1'b z;
+    end
+      
+    if (cmd == 0)
+    begin
+      case (counter)
+        0 : 
+        begin
+          inputs_level = in;
+        end
+        1 : 
+        begin
+          inputs_level = 0;
+        end  
+        MAX_TIME :
+        begin
+          for (int i = 1; i <= OUTPUTS_COUNT; i++)
+          begin
+            if (out[i] === 1'b z)
+              out[i] = 0;
+          end
+          counter = MAX_TIME - 1;
+        end
+      endcase;
+      out_ready = 1;
+      for (int i = 1; i <= OUTPUTS_COUNT; i++)
+      begin
+        if (out[i] === 1'b z && (outputs_level[i * 2 - 1] || outputs_level[i * 2]))
+          out[i] = outputs_level[i * 2 - 1] ? 1 : 0;
+        if (out[i] === 1'b z)
+          out_ready = 0;
+      end
+      if (out_ready)
+        out[0] = 1;
+    counter = counter + 1;
+    end    
+  end
+  
+endmodule
