@@ -11,6 +11,7 @@ target_link_libraries(Perceptron ${OpenCL_LIBRARY})
 
 # copy kernel to working directory
 file(COPY neuron.cl DESTINATION .)
+file(COPY batchedNeuron.cl DESTINATION .)
 # copy resources to working directory
 file(COPY network_digits DESTINATION .)
 file(COPY network_xor DESTINATION .)

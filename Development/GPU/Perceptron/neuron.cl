@@ -89,9 +89,8 @@ __kernel void neuron(
     __global const float* valuesVector = calculatePreviousLayerBeginning(inputs, values, layerSizes, layerId);
 
     while (counters[layerId - 1] > 0) {
-//      busy wait
+//        busy wait
     }
-
     float resultValue = dotProduct(weightsVector, valuesVector, layerSizes[layerId - 1] + 1);
     *calculateTargetValuePtr(values, outputs, valuesNumber, layersNumber, layerId, globalId) =
             layerId < layersNumber - 1 ? activationFunction(resultValue) : sigmoid(resultValue);
