@@ -11,6 +11,7 @@
 #define __CL_ENABLE_EXCEPTIONS
 #include <cl.hpp>
 #include <errCode.h>
+#include <cmath>
 
 #include "FullyConnectedNN.h"
 #include "Layer.h"
@@ -137,8 +138,9 @@ vector<vector<float>> processMultipleInputs(ClStructHolder& holder, vector<int>&
         kernel.setArg(5, layerId);
         kernel.setArg(6, weightsOffset);
         kernel.setArg(7, valuesOffset);
+        kernel.setArg(8, cl::Local(sizeof(float) * (layerSizes[layerId] + 1)));
 
-        queue.enqueueNDRangeKernel(holder.getKernel(), cl::NullRange, (size_t) layerSizes[layerId + 1], 1);
+        queue.enqueueNDRangeKernel(holder.getKernel(), cl::NullRange, (size_t) layerSizes[layerId + 1] * 10, 1);
         queue.finish();
 
         weightsOffset += (layerSizes[layerId] + 1) * layerSizes[layerId + 1];
@@ -261,27 +263,32 @@ void testDigitsBatched() {
         holder.getKernel().setArg(1, (int) layerSizes.size());
         holder.getKernel().setArg(2, weightsBuffer);
 
+        int imagesNumber = 100000;
+        vector<vector<float>> inputsExtended((size_t) imagesNumber);
+        vector<vector<float>> outputsExtended((size_t) imagesNumber);
+        for (int i = 0; i < imagesNumber; ++i) {
+            inputsExtended[i] = inputs[i % inputs.size()];
+            outputsExtended[i] = expectedOutputs[i % expectedOutputs.size()];
+        }
+
         auto start = chrono::steady_clock::now();
-        int imagesNumber = 10000;
         int correctOutputNumber = 0;
 
-        for (int batch = 0 ; batch < 100; ++batch) {
-            auto outputs = processMultipleInputs(holder, layerSizes, weights, inputs);
-            for (size_t i = 0; i < outputs.size(); ++i) {
-                vector<float> predictedOutput = outputs[i % inputs.size()];
-                vector<float> expectedOutput = expectedOutputs[i % inputs.size()];
+        auto outputs = processMultipleInputs(holder, layerSizes, weights, inputsExtended);
+        for (size_t i = 0; i < outputs.size(); ++i) {
+            vector<float>& predictedOutput = outputs[i];
+            vector<float>& expectedOutput = outputsExtended[i];
 
-                bool isOutputCorrect = true;
-                for (int j = 0; j < predictedOutput.size(); ++j) {
-                    isOutputCorrect = isOutputCorrect && (predictedOutput[j] - expectedOutput[j]) < 0.45;
-                }
-                if (isOutputCorrect) {
-                    ++correctOutputNumber;
-                }
+            bool isOutputCorrect = true;
+            for (int j = 0; j < predictedOutput.size(); ++j) {
+                isOutputCorrect = isOutputCorrect && fabs(predictedOutput[j] - expectedOutput[j]) < 0.49;
+            }
+            if (isOutputCorrect) {
+                ++correctOutputNumber;
             }
         }
         cout << chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start).count() << endl;
-//        cout << float(correctOutputNumber) / outputs.size() << endl;
+        cout << float(correctOutputNumber) / outputs.size() << endl;
 
     } catch (const cl::Error& e) {
         cerr << errCode(e.err()) << endl;
