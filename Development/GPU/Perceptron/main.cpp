@@ -18,9 +18,6 @@
 
 using namespace std;
 
-using Vector = vector<float>;
-using IntVector = vector<int>;
-
 FullyConnectedNN loadFullyConnectedNN(const string& filename) {
     ifstream in(filename);
 
@@ -32,23 +29,23 @@ FullyConnectedNN loadFullyConnectedNN(const string& filename) {
         int width;
         inWidth >> width;
         string strWeights;
-        vector<Vector> weights;
+        vector<vector<float>> weights;
         for (int i = 0; i < width; i++) {
             getline(in, strWeights);
             istringstream iss(strWeights);
-            Vector neuronWeights{istream_iterator<float>{iss}, istream_iterator<float>{}};
+            vector<float> neuronWeights{istream_iterator<float>{iss}, istream_iterator<float>{}};
             weights.push_back(neuronWeights);
         }
         string strBiases;
         getline(in, strBiases);
         istringstream iss(strBiases);
-        Vector biases{istream_iterator<float>{iss}, istream_iterator<float>{}};
+        vector<float> biases{istream_iterator<float>{iss}, istream_iterator<float>{}};
         layers.push_back(Layer(width, weights, biases));
     }
     return FullyConnectedNN(layers);
 }
 
-ClStructHolder buildClHolder(string kernelFileName, const IntVector& layerSizes, const Vector& weights,
+ClStructHolder buildClHolder(string kernelFileName, const vector<int>& layerSizes, const vector<float>& weights,
         const char* functionName) {
     cl::Device defaultDevice = cl::Device::getDefault();
     cl::Context context(defaultDevice);
@@ -75,8 +72,8 @@ ClStructHolder buildClHolder(string kernelFileName, const IntVector& layerSizes,
     return ClStructHolder(context, queue, kernel, threadNumber);
 }
 
-void processSingleInput(ClStructHolder& holder, IntVector& layerSizes, Vector& weights, Vector& values,
-        Vector& input, Vector& output, IntVector& counters) {
+void processSingleInput(ClStructHolder& holder, vector<int>& layerSizes, vector<float>& weights, vector<float>& values,
+        vector<float>& input, vector<float>& output, vector<int>& counters) {
     cl::Context context = holder.getContext();
     cl::CommandQueue queue = holder.getQueue();
     cl::Kernel kernel = holder.getKernel();
@@ -93,23 +90,22 @@ void processSingleInput(ClStructHolder& holder, IntVector& layerSizes, Vector& w
     kernel.setArg(6, (int) values.size());
     kernel.setArg(7, (int) layerSizes.size());
 
-    // TODO: fix working group size - 1 is extremely inefficient
     queue.enqueueNDRangeKernel(holder.getKernel(), cl::NullRange, holder.getGlobalRange(), cl::NDRange(1));
     queue.finish();
 
     cl::copy(queue, outputBuffer, output.begin(), output.end());
 }
 
-vector<Vector> processMultipleInputs(ClStructHolder& holder, IntVector& layerSizes, Vector& weights,
-        vector<Vector>& inputs) {
+vector<vector<float>> processMultipleInputs(ClStructHolder& holder, vector<int>& layerSizes, vector<float>& weights,
+        vector<vector<float>>& inputs) {
     if (layerSizes.size() == 0) {
         return {};
     }
     size_t batchSize = inputs.size();
-    vector<Vector> outputs(batchSize, Vector((size_t) layerSizes.back()));
+    vector<vector<float>> outputs(batchSize, vector<float>((size_t) layerSizes.back()));
 
     int neuronsNumber = accumulate(layerSizes.begin(), layerSizes.end(), 0);
-    Vector values((neuronsNumber + layerSizes.size() - 1) * batchSize, 0); // + size - 1 because of biases
+    vector<float> values((neuronsNumber + layerSizes.size() - 1) * batchSize, 0); // + size - 1 because of biases
 
     // pack batch into values buffer and init biases
     for (int i = 0; i < batchSize; ++i) {
@@ -142,7 +138,7 @@ vector<Vector> processMultipleInputs(ClStructHolder& holder, IntVector& layerSiz
         kernel.setArg(6, weightsOffset);
         kernel.setArg(7, valuesOffset);
 
-        queue.enqueueNDRangeKernel(holder.getKernel(), cl::NullRange, (size_t) layerSizes[layerId + 1]);
+        queue.enqueueNDRangeKernel(holder.getKernel(), cl::NullRange, (size_t) layerSizes[layerId + 1], 1);
         queue.finish();
 
         weightsOffset += (layerSizes[layerId] + 1) * layerSizes[layerId + 1];
@@ -162,12 +158,12 @@ vector<Vector> processMultipleInputs(ClStructHolder& holder, IntVector& layerSiz
 void testXor() {
     FullyConnectedNN network = loadFullyConnectedNN("network_xor");
 
-    IntVector layerSizes = network.getSizes();
-    Vector weights = network.getAllWeights();
-    Vector values = network.getEmptyValues();
-    vector<Vector> inputs = {{0, 0}, {0, 1}, {1, 0}, {1, 1}};
-    vector<Vector> expectedOutputs = {{0}, {1}, {1}, {0}};
-    IntVector counters(layerSizes.begin(), layerSizes.end());
+    vector<int> layerSizes = network.getSizes();
+    vector<float> weights = network.getAllWeights();
+    vector<float> values = network.getEmptyValues();
+    vector<vector<float>> inputs = {{0, 0}, {0, 1}, {1, 0}, {1, 1}};
+    vector<vector<float>> expectedOutputs = {{0}, {1}, {1}, {0}};
+    vector<int> counters(layerSizes.begin(), layerSizes.end());
     counters[0] = 0;
 
     try {
@@ -179,10 +175,10 @@ void testXor() {
 
         auto start = chrono::steady_clock::now();
         for (size_t i = 0; i < inputs.size() * 1000; ++i) {
-            Vector input;
+            vector<float> input;
             input.push_back(1);
             input.insert(input.end(), inputs[i % inputs.size()].begin(), inputs[i % inputs.size()].end());
-            Vector predictedOutput(layerSizes.back());
+            vector<float> predictedOutput(layerSizes.back());
             processSingleInput(holder, layerSizes, weights, values, input, predictedOutput, counters);
 
             bool isOutputCorrect = true;
@@ -203,12 +199,12 @@ void testXor() {
 void testDigits() {
     FullyConnectedNN network = loadFullyConnectedNN("network_digits");
 
-    IntVector layerSizes = network.getSizes();
-    Vector weights = network.getAllWeights();
-    Vector values = network.getEmptyValues();
-    vector<Vector> inputs = network.getInput("input_digits");
-    vector<Vector> expectedOutputs = network.getOutput("output_digits");
-    IntVector counters(layerSizes.begin(), layerSizes.end());
+    vector<int> layerSizes = network.getSizes();
+    vector<float> weights = network.getAllWeights();
+    vector<float> values = network.getEmptyValues();
+    vector<vector<float>> inputs = network.getInput("input_digits");
+    vector<vector<float>> expectedOutputs = network.getOutput("output_digits");
+    vector<int> counters(layerSizes.begin(), layerSizes.end());
     counters[0] = 0;
 
     try {
@@ -223,10 +219,10 @@ void testDigits() {
         int correctOutputNumber = 0;
 
         for (size_t i = 0; i < imagesNumber; ++i) {
-            Vector input;
+            vector<float> input;
             input.push_back(1);
             input.insert(input.end(), inputs[i % inputs.size()].begin(), inputs[i % inputs.size()].end());
-            Vector predictedOutput(layerSizes.back());
+            vector<float> predictedOutput(layerSizes.back());
             processSingleInput(holder, layerSizes, weights, values, input, predictedOutput, counters);
 
             bool isOutputCorrect = true;
@@ -251,11 +247,11 @@ void testDigits() {
 void testDigitsBatched() {
     FullyConnectedNN network = loadFullyConnectedNN("network_digits");
 
-    IntVector layerSizes = network.getSizes();
-    Vector weights = network.getAllWeights();
-    Vector values = network.getEmptyValues();
-    vector<Vector> inputs = network.getInput("input_digits");
-    vector<Vector> expectedOutputs = network.getOutput("output_digits");
+    vector<int> layerSizes = network.getSizes();
+    vector<float> weights = network.getAllWeights();
+    vector<float> values = network.getEmptyValues();
+    vector<vector<float>> inputs = network.getInput("input_digits");
+    vector<vector<float>> expectedOutputs = network.getOutput("output_digits");
 
     try {
         ClStructHolder holder = buildClHolder("batchedNeuron.cl", layerSizes, weights, "batchedNeuron");
@@ -269,11 +265,11 @@ void testDigitsBatched() {
         int imagesNumber = 10000;
         int correctOutputNumber = 0;
 
-        for (int batch = 0 ; batch < 90; ++batch) {
+        for (int batch = 0 ; batch < 100; ++batch) {
             auto outputs = processMultipleInputs(holder, layerSizes, weights, inputs);
             for (size_t i = 0; i < outputs.size(); ++i) {
-                Vector predictedOutput = outputs[i % inputs.size()];
-                Vector expectedOutput = expectedOutputs[i % inputs.size()];
+                vector<float> predictedOutput = outputs[i % inputs.size()];
+                vector<float> expectedOutput = expectedOutputs[i % inputs.size()];
 
                 bool isOutputCorrect = true;
                 for (int j = 0; j < predictedOutput.size(); ++j) {
