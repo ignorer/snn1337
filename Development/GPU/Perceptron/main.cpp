@@ -73,31 +73,6 @@ ClStructHolder buildClHolder(string kernelFileName, const vector<int>& layerSize
     return ClStructHolder(context, queue, kernel, threadNumber);
 }
 
-void processSingleInput(ClStructHolder& holder, vector<int>& layerSizes, vector<float>& weights, vector<float>& values,
-        vector<float>& input, vector<float>& output, vector<int>& counters) {
-    cl::Context context = holder.getContext();
-    cl::CommandQueue queue = holder.getQueue();
-    cl::Kernel kernel = holder.getKernel();
-
-    cl::Buffer countersBuffer(context, counters.begin(), counters.end(), true);
-    cl::Buffer valuesBuffer(context, values.begin(), values.end(), true);
-    cl::Buffer inputBuffer(context, input.begin(), input.end(), true);
-    cl::Buffer outputBuffer(context, output.begin(), output.end(), false);
-
-    kernel.setArg(2, countersBuffer);
-    kernel.setArg(3, valuesBuffer);
-    kernel.setArg(4, inputBuffer);
-    kernel.setArg(5, outputBuffer);
-    kernel.setArg(6, (int) values.size());
-    kernel.setArg(7, (int) layerSizes.size());
-
-    // TODO: fix working group size - 1 is extremely inefficient
-    queue.enqueueNDRangeKernel(holder.getKernel(), cl::NullRange, holder.getGlobalRange(), cl::NDRange(1));
-    queue.finish();
-
-    cl::copy(queue, outputBuffer, output.begin(), output.end());
-}
-
 vector<vector<float>> processMultipleInputs(ClStructHolder& holder, vector<int>& layerSizes, vector<float>& weights,
         vector<vector<float>>& inputs, int batchSize) {
     if (layerSizes.size() == 0) {
@@ -157,95 +132,6 @@ vector<vector<float>> processMultipleInputs(ClStructHolder& holder, vector<int>&
         memcpy(outputs[i].data(), outputsPtr + i * layerSizes.back(), sizeof(float) * layerSizes.back());
     }
     return outputs;
-}
-
-void testXor() {
-    FullyConnectedNN network = loadFullyConnectedNN("network_xor");
-
-    vector<int> layerSizes = network.getSizes();
-    vector<float> weights = network.getAllWeights();
-    vector<float> values = network.getEmptyValues();
-    vector<vector<float>> inputs = {{0, 0}, {0, 1}, {1, 0}, {1, 1}};
-    vector<vector<float>> expectedOutputs = {{0}, {1}, {1}, {0}};
-    vector<int> counters(layerSizes.begin(), layerSizes.end());
-    counters[0] = 0;
-
-    try {
-        ClStructHolder holder = buildClHolder("neuron.cl", layerSizes, weights, "neuron");
-        cl::Buffer layersBuffer(holder.getContext(), layerSizes.begin(), layerSizes.end(), true);
-        cl::Buffer weightsBuffer(holder.getContext(), weights.begin(), weights.end(), true);
-        holder.getKernel().setArg(0, layersBuffer);
-        holder.getKernel().setArg(1, weightsBuffer);
-
-        auto start = chrono::steady_clock::now();
-        for (size_t i = 0; i < inputs.size() * 1000; ++i) {
-            vector<float> input;
-            input.push_back(1);
-            input.insert(input.end(), inputs[i % inputs.size()].begin(), inputs[i % inputs.size()].end());
-            vector<float> predictedOutput(layerSizes.back());
-            processSingleInput(holder, layerSizes, weights, values, input, predictedOutput, counters);
-
-            bool isOutputCorrect = true;
-            for (int j = 0; j < predictedOutput.size(); ++j) {
-                isOutputCorrect = isOutputCorrect && (predictedOutput[j] - expectedOutputs[i % inputs.size()][j]) < 1e-5;
-            }
-//            cout << i << ": " << (isOutputCorrect ? "correct" : "wrong") << endl;
-        }
-        cout << chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start).count() << endl;
-
-    } catch (const cl::Error& e) {
-        cerr << errCode(e.err()) << endl;
-    } catch (const exception& e) {
-        cerr << e.what() << endl;
-    }
-}
-
-void testDigits() {
-    FullyConnectedNN network = loadFullyConnectedNN("network_digits");
-
-    vector<int> layerSizes = network.getSizes();
-    vector<float> weights = network.getAllWeights();
-    vector<float> values = network.getEmptyValues();
-    vector<vector<float>> inputs = network.getInput("input_digits");
-    vector<vector<float>> expectedOutputs = network.getOutput("output_digits");
-    vector<int> counters(layerSizes.begin(), layerSizes.end());
-    counters[0] = 0;
-
-    try {
-        ClStructHolder holder = buildClHolder("neuron.cl", layerSizes, weights, "neuron");
-        cl::Buffer layersBuffer(holder.getContext(), layerSizes.begin(), layerSizes.end(), true);
-        cl::Buffer weightsBuffer(holder.getContext(), weights.begin(), weights.end(), true);
-        holder.getKernel().setArg(0, layersBuffer);
-        holder.getKernel().setArg(1, weightsBuffer);
-
-        auto start = chrono::steady_clock::now();
-        int imagesNumber = 10000;
-        int correctOutputNumber = 0;
-
-        for (size_t i = 0; i < imagesNumber; ++i) {
-            vector<float> input;
-            input.push_back(1);
-            input.insert(input.end(), inputs[i % inputs.size()].begin(), inputs[i % inputs.size()].end());
-            vector<float> predictedOutput(layerSizes.back());
-            processSingleInput(holder, layerSizes, weights, values, input, predictedOutput, counters);
-
-            bool isOutputCorrect = true;
-            for (int j = 0; j < predictedOutput.size(); ++j) {
-                isOutputCorrect =
-                        isOutputCorrect && (predictedOutput[j] - expectedOutputs[i % inputs.size()][j]) < 0.45;
-            }
-            if (isOutputCorrect) {
-                ++correctOutputNumber;
-            }
-        }
-        cout << chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start).count() << endl;
-        cout << float(correctOutputNumber) / imagesNumber << endl;
-
-    } catch (const cl::Error& e) {
-        cerr << errCode(e.err()) << endl;
-    } catch (const exception& e) {
-        cerr << e.what() << endl;
-    }
 }
 
 void testDigitsBatched() {

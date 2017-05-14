@@ -10,12 +10,7 @@ add_executable(Perceptron ${SOURCE_FILES})
 target_link_libraries(Perceptron ${OpenCL_LIBRARY})
 
 # copy kernel to working directory
-file(COPY neuron.cl DESTINATION .)
 file(COPY batchedNeuron.cl DESTINATION .)
 # copy resources to working directory
-file(COPY network_digits DESTINATION .)
-file(COPY network_xor DESTINATION .)
 file(COPY network_mnist DESTINATION .)
-file(COPY input_digits DESTINATION .)
-file(COPY output_digits DESTINATION .)
 file(COPY mnist DESTINATION .)
