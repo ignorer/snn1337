@@ -1,4 +1,4 @@
-float dotProductLocal(__local const float* a, __global const float* b, size_t size) {
+float dotProduct(__global const float* a, __global const float* b, size_t size) {
     float res = 0;
     for (size_t i = 0; i < size; i++) {
         res += a[i] * b[i];
@@ -6,7 +6,7 @@ float dotProductLocal(__local const float* a, __global const float* b, size_t si
     return res;
 }
 
-float dotProduct(__global const float* a, __global const float* b, size_t size) {
+float dotProductLocal(__local const float* a, __global const float* b, size_t size) {
     float res = 0;
     for (size_t i = 0; i < size; i++) {
         res += a[i] * b[i];
@@ -22,7 +22,7 @@ float activationFunction(float x, int layerId, int layersNumber) {
 
 __kernel void batchedNeuron(
         // network parameters
-        __global const int* layerSizes,
+        __constant int* layerSizes,
         int layersNumber,
         __global const float* weights,
         // per-batch parameters
@@ -37,7 +37,7 @@ __kernel void batchedNeuron(
     int previousLayerSize = layerSizes[layerId];
     int layerSize = layerSizes[layerId + 1];
 
-    __global const float* weightsVector = weights + weightsOffset + (neuronId % layerSize) * (previousLayerSize + 1);
+    __global const float* weightsVector = weights + weightsOffset + neuronId * (previousLayerSize + 1);
     __global const float* valuesVector = values + valuesOffset;
     int biasCorrection = (layerId < layersNumber - 2) ? 1 : 0;
     int targetIndex = valuesOffset + (previousLayerSize + 1) * batchSize + neuronId + biasCorrection;
@@ -49,7 +49,7 @@ __kernel void batchedNeuron(
     }
 }
 
-__kernel void batchedNeuronParallel(
+__kernel void batchedNeuronLocal(
         // network parameters
         __global const int* layerSizes,
         int layersNumber,

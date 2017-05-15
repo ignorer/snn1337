@@ -9,6 +9,7 @@
 #include <chrono>
 
 #define __CL_ENABLE_EXCEPTIONS
+
 #include <cl.hpp>
 #include <errCode.h>
 
@@ -73,8 +74,38 @@ ClStructHolder buildClHolder(string kernelFileName, const vector<int>& layerSize
     return ClStructHolder(context, queue, kernel, threadNumber);
 }
 
+float accuracyDigits(vector<vector<float>> outputs, vector<int> expectedOutputs,
+                     int batchSize, int batch_number) {
+    float correctOutputNumber = 0;
+    for (size_t i = 0; i < batchSize; ++i) {
+        vector<float> predictedOutputs = outputs[i];
+
+        int expectedOutput = expectedOutputs[i + batch_number * batchSize];
+
+        int predictedOutput = (int) (max_element(predictedOutputs.begin(), predictedOutputs.end())
+                                     - predictedOutputs.begin());
+        if (predictedOutput == expectedOutput) {
+            ++correctOutputNumber;
+        }
+    }
+    return correctOutputNumber / batchSize;
+}
+
+int getMaximumWorkersNumber(int unitsToCompute) {
+    return min(CL_DEVICE_MAX_COMPUTE_UNITS, unitsToCompute);
+}
+
+int getMaximumWorkGroupSize(int unitsNumber) {
+    for (int workGroupSize = CL_DEVICE_MAX_WORK_GROUP_SIZE; workGroupSize > 0; workGroupSize--) {
+        if (unitsNumber % workGroupSize == 0) {
+            return workGroupSize;
+        }
+    }
+    return -1;
+}
+
 vector<vector<float>> processMultipleInputs(ClStructHolder& holder, vector<int>& layerSizes, vector<float>& weights,
-        vector<vector<float>>& inputs, int batchSize) {
+        vector<vector<float>>& inputs, int batchSize, int batchNumber, bool workGroupSizeisOne = false) {
     if (layerSizes.size() == 0) {
         return {};
     }
@@ -85,7 +116,8 @@ vector<vector<float>> processMultipleInputs(ClStructHolder& holder, vector<int>&
 
     // pack batch into values buffer and init biases
     for (int i = 0; i < batchSize; ++i) {
-        memcpy(values.data() + (layerSizes[0] + 1) * i + 1, inputs[i].data(), sizeof(float) * layerSizes[0]);
+        memcpy(values.data() + (layerSizes[0] + 1) * i + 1, inputs[i + batchNumber * batchSize].data(),
+            sizeof(float) * layerSizes[0]);
     }
     int biasIndex = 0;
     for (int i = 0; i < layerSizes.size() - 1; ++i) {
@@ -114,10 +146,21 @@ vector<vector<float>> processMultipleInputs(ClStructHolder& holder, vector<int>&
         kernel.setArg(6, weightsOffset);
         kernel.setArg(7, valuesOffset);
 
-        // next two lines are effective only for advanced gpu
-//        kernel.setArg(8, cl::Local(sizeof(float) * (layerSizes[layerId] + 1)));
-//        queue.enqueueNDRangeKernel(holder.getKernel(), cl::NullRange, (size_t) layerSizes[layerId + 1] * 10, 1);
-        queue.enqueueNDRangeKernel(holder.getKernel(), cl::NullRange, (size_t) layerSizes[layerId + 1], cl::NullRange);
+        // TODO: switch to layerSizes[layerId + 1] * batchSize after properly implementing getMaximumWorkersNumber
+        int unitsNumber = getMaximumWorkersNumber(layerSizes[layerId + 1]);
+        int workGroupSize = 1;
+        if (!workGroupSizeisOne) {
+            workGroupSize = getMaximumWorkGroupSize(unitsNumber);
+        }
+
+        cout << "unitsNumber for layer " << layerId << ": " << unitsNumber << endl;
+        cout << "workGroupSize for layer " << layerId << ": " << workGroupSize << endl;
+
+        if (workGroupSizeisOne) {
+            kernel.setArg(8, cl::Local(sizeof(float) * (layerSizes[layerId] + 1)));
+        }
+        queue.enqueueNDRangeKernel(holder.getKernel(), cl::NullRange, cl::NDRange(unitsNumber),
+            cl::NDRange(workGroupSize));
         queue.finish();
 
         weightsOffset += (layerSizes[layerId] + 1) * layerSizes[layerId + 1];
@@ -134,46 +177,43 @@ vector<vector<float>> processMultipleInputs(ClStructHolder& holder, vector<int>&
     return outputs;
 }
 
-void testDigitsBatched() {
+void testDigitsBatched(int batchSize, bool workGroupSizeisOne = false) {
     FullyConnectedNN network = loadFullyConnectedNN("network_mnist");
-    InputReader inputReader;
-    inputReader.read();
+    InputReader ir;
+    ir.read();
 
     vector<int> layerSizes = network.getSizes();
     vector<float> weights = network.getAllWeights();
     vector<float> values = network.getEmptyValues();
-    vector<vector<float>> inputs = inputReader.getTestImageFloatData();
-    vector<int> expectedOutputs = inputReader.getTestImagesLabels();
+    vector<vector<float>> inputs = ir.getTestImageFloatData();
+    vector<int> expectedOutputs = ir.getTestImagesLabels();
 
     try {
         ClStructHolder holder = buildClHolder("batchedNeuron.cl", layerSizes, weights, "batchedNeuron");
+        if (workGroupSizeisOne) {
+            holder = buildClHolder("batchedNeuron.cl", layerSizes, weights, "batchedNeuronLocal");
+        }
         cl::Buffer layersSizesBuffer(holder.getContext(), layerSizes.begin(), layerSizes.end(), true);
         cl::Buffer weightsBuffer(holder.getContext(), weights.begin(), weights.end(), true);
         holder.getKernel().setArg(0, layersSizesBuffer);
         holder.getKernel().setArg(1, (int) layerSizes.size());
         holder.getKernel().setArg(2, weightsBuffer);
 
+        int imagesNumber = inputs.size();
+
         auto start = chrono::steady_clock::now();
-        int correctOutputNumber = 0;
-        int batchSize = (int) inputs.size();
 
-        auto outputs = processMultipleInputs(holder, layerSizes, weights, inputs, batchSize);
+        float accuracy = 0;
 
-        for (size_t i = 0; i < batchSize; ++i) {
-            vector<float>& predictedOutputs = outputs[i];
-
-            int expectedOutput = expectedOutputs[i];
-
-            int predictedOutput = (int) (max_element(predictedOutputs.begin(), predictedOutputs.end())
-                    - predictedOutputs.begin());
-            if (predictedOutput == expectedOutput) {
-                ++correctOutputNumber;
-            }
+        for (int i = 0; i < imagesNumber / batchSize; i++) {
+            auto outputs = processMultipleInputs(holder, layerSizes, weights, inputs, batchSize, i,
+                workGroupSizeisOne);
+            accuracy += accuracyDigits(outputs, expectedOutputs, batchSize, i);
+            cout << "batch " << i << " accuracy: " <<  accuracy / (i + 1) << endl;
         }
-        cout << "images number: " << inputs.size() << endl;
-        cout << "elapsed time: " << chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start).count() << endl;
-        cout << "accuracy: " << float(correctOutputNumber) / inputs.size() << endl;
 
+        cout << "time:" <<
+            chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start).count() << endl;
 
     } catch (const cl::Error& e) {
         cerr << errCode(e.err()) << endl;
@@ -183,6 +223,6 @@ void testDigitsBatched() {
 }
 
 int main() {
-    testDigitsBatched();
+    testDigitsBatched(1000, true);
     return 0;
 }
