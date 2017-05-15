@@ -15,14 +15,14 @@ inline float spikeFunc(float t, float tau) {
     return 0;
 }
 
-void calcRecvPot(__private float* recvPot,__global const float* weights, __global const int* spikes,
-  int spikesPerSyn, int synPerConn, size_t connNum) {
-    // recievedPot is a precalculated hash-table [{spikeId: its potential}, ...]
+void calcSpikePot(__global float* spikePotentials,__global const float* weights, __global const int* spikes,
+                  int spikesPerSyn, int synPerConn, int connNum) {
+    // spikePotentials is a precalculated hash-table [{spikeId: its potential}, ...]
     int i;
     int j;
-    for (j = 0; j < connNum * synPerConn; ++j) {
+    for (j = 0; j < connNum * synPerConn - 1; ++j) {
         for (i = 0; i < spikesPerSyn; ++i)
-            recvPot[i] += weights[j] * spikeFunc(spikes[j * spikesPerSyn + i], SPIKE_FUNCTION_PARAM);
+            spikePotentials[j * spikesPerSyn + i] += weights[j] * spikeFunc(spikes[j * spikesPerSyn + i], SPIKE_FUNCTION_PARAM);
     }
 }
 
@@ -52,7 +52,7 @@ int calcNeuronId(__global const int* layerSizes, int globalId, size_t layerId) {
 }
 
 __global int* calcPrevLayerStart(__global const float* input, __global int* spikes,
-  __global const int* layerSizes, int layerId, const int synPerConn, const int spikesPerSyn) {
+                                 __global const int* layerSizes, int layerId, const int synPerConn, const int spikesPerSyn) {
     if (layerId == 1) {
         int i;
         int j;
@@ -75,7 +75,7 @@ __global int* calcPrevLayerStart(__global const float* input, __global int* spik
 }
 
 __global const float* calcWeightsStart(__global const float* weights, __global const int* layerSizes,
-  const int synPerConn, int layerId, int neuronId) {
+                                       const int synPerConn, int layerId, int neuronId) {
     int i;
     // skip all Prev layers
     for (i = 0; i < layerId - 1; ++i) {
@@ -87,8 +87,8 @@ __global const float* calcWeightsStart(__global const float* weights, __global c
 }
 
 __global int* calcTargetSpikesPtr(__global int* spikes, __global int* output,
-  const int layersNum, const int spikesNum, const int layerId, const int globalId) {
-    if (layerId < layersNum - 1) { // if we're on hidden layer
+                                  const int layersNum, const int spikesNum, const int layerId, const int globalId) {
+    if (layerId < layersNum - 1) {
         __global int* result = spikes + globalId;
         return result;
     }
@@ -103,6 +103,7 @@ __kernel void neuron(
         int exitTime,
         __global const float* weights,
         __global int* spikes,
+        __global float* spikePotentials,
         float threshold,
         volatile __global int* t,
         __global int* sem,
@@ -128,22 +129,19 @@ __kernel void neuron(
     // precalculate potentials that produce each recieved spike
     // on same layer this rule is always correct:
     // i < j ==> spikes[i] < spikes[j] ==> pot. of spikes[i] is spikePot[i]
-    __private float spikePots[SPIKES_SIZE];
-    int i;
-    for(i = 0; i < SPIKES_SIZE; ++i)
-        spikePots[i] = 0.0;
-    calcRecvPot(spikePots, weightsVec, inputSpikesVec, spikesPerSyn, synPerConn, layerSizes[layerId - 1]);
+    calcSpikePot(spikePotentials, weightsVec, inputSpikesVec, spikesPerSyn, synPerConn, layerSizes[layerId - 1]);
 
+    int i = 0;
     int j = 0;
     int k = 0;
     float pot = 0;
     while (*t < exitTime) {
         for (i = 0; i < DELTA_T; ++i) {
-            if (k < spikesPerSyn * synPerConn &&  spikePots[k] <= *t + i)
-                pot += spikePots[k++];
+            if (k < spikesPerSyn * synPerConn &&  spikePotentials[k] <= *t + i)
+                pot += spikePotentials[k++];
             if (pot >= threshold) {
                 if ( (layerId == layersNum - 1 && j < exitTime * layerSizes[layerId])
-                || (layerId < layersNum - 1 && j < layerSizes[layerId + 1]))
+                    || (layerId < layersNum - 1 && j < layerSizes[layerId + 1]))
                 outputVec[j++] = *t + i;
                 pot += refractoryFunc(*t + i - k, threshold, REFRACTORY_FUNCTION_PARAM);
 

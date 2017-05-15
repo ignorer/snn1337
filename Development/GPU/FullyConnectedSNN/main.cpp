@@ -1,34 +1,16 @@
-//
-// Created by mariia on 16.04.2017.
-//
-
-//1) int* sizes - массив с размерами слоёв. Включает в себя размер входной и выходной слой
-//2) int layersNumber - размер массива sizes, просто нужно передать в kernel
-//3) int synapsesPerConnection - количество синаптических связей на соединение
-//4) int spikesPerSynapse - количество спайков, которые одновременно может помнить один синапс
-//5) int exitTime - количество тактов работы сети, после которого та прекращает свою работу
-//6) float* weights - массив с весами связей
-//7) int* spikes - массив, который содержит время отправления каждого спайка. Изначально времена всех спайков установлены на -inf (например, -100),
-// без например, а просто -100,
-//8) int* t - указатель на время, изначально равен 0
-//9) int* sem - семафор для синхронизации всех нейронов. Изначально равен количеству нейронов вместе со входным и выходным слоями
-//10) int* input - буфер, содержащий частоты, с которыми работают нейроны входного слоя
-//11) int* output - буфер с временами спайков, выходящих с последнего слоя сети. Его размер равен произведению размера последнего слоя и exitTime
-
-
 #include <cstdlib>
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <sstream>
-#include <iterator>
-#include <algorithm>
-#include <numeric>
 #include <chrono>
 
 #define __CL_ENABLE_EXCEPTIONS
 #include <cl.hpp>
 #include <errCode.h>
+#include <iterator>
+#include <algorithm>
+#include <numeric>
 
 #include "Layer.h"
 #include "ClStructHolder.h"
@@ -36,9 +18,6 @@
 #include "NetworkInitializer.h"
 #include "InputReader.h"
 
-
-typedef int size_type;
-// we want typedef unsigned int size_type;
 using namespace std;
 
 ClStructHolder buildCLHolder(const char* kernelFileName, vector<float>& weights, vector<int> sizes,
@@ -79,8 +58,8 @@ void processSingleInput(ClStructHolder& holder, vector<int>& sizes, vector<float
     cl::Buffer inputBuffer(context, input.begin(), input.end(), true);
     cl::Buffer outputBuffer(context, output.begin(), output.end(), false);
 
-    kernel.setArg(10, inputBuffer);
-    kernel.setArg(11, outputBuffer);
+    kernel.setArg(11, inputBuffer);
+    kernel.setArg(12, outputBuffer);
     kernel.setArg(6, spikesBuffer);
     kernel.setArg(1, (int) sizes.size());
 
@@ -102,13 +81,14 @@ void testNetwork(std::string testName, float precision) {
         inputs.push_back(ir.getFrequencies(trainImagesData[i]));
     }
 
-    vector<size_type> layerSizes = network.getSizes();
+    vector<int> layerSizes = network.getSizes();
     vector<float> weights = network.getAllWeights();
     vector<vector<int>> expectedOutputs ;
     for (int i = 0; i < trainImagesData.size(); ++i) {
         expectedOutputs.push_back(ir.getTestImagesLabels());
     }
     vector<int> spikes;
+    vector<float> potentials;
     vector<int> t(1);
     vector<int> sem(1);
     float threshold = network.getThreshold();
@@ -122,6 +102,8 @@ void testNetwork(std::string testName, float precision) {
     }
     numberOfSpikes *= synapsesPerConnection*spikesPerSynapse;
     spikes.resize(numberOfSpikes, -100);
+    int maxSpikesInLayer = *max_element(layerSizes.begin(), layerSizes.end()) * synapsesPerConnection * spikesPerSynapse;
+    potentials.resize((unsigned int)maxSpikesInLayer, 0.);
 
     try {
         ClStructHolder holder = buildCLHolder("neuron.cl", weights, layerSizes, "neuron");
@@ -129,14 +111,16 @@ void testNetwork(std::string testName, float precision) {
         cl::Buffer weightsBuffer(holder.getContext(), weights.begin(), weights.end(), true);
         cl::Buffer tBuffer(holder.getContext(), t.begin(), t.end(), true);
         cl::Buffer semBuffer(holder.getContext(), sem.begin(), sem.end(), true);
+        cl::Buffer potentialsBuffer(holder.getContext(), potentials.begin(), potentials.end(), true);
         holder.getKernel().setArg(0, layersBuffer);
         holder.getKernel().setArg(2, synapsesPerConnection);
         holder.getKernel().setArg(3, spikesPerSynapse);
         holder.getKernel().setArg(4, exitTime);
         holder.getKernel().setArg(5, weightsBuffer);
-        holder.getKernel().setArg(7, threshold);
-        holder.getKernel().setArg(8, tBuffer);
-        holder.getKernel().setArg(9, semBuffer);
+        holder.getKernel().setArg(7, potentialsBuffer);
+        holder.getKernel().setArg(8, threshold);
+        holder.getKernel().setArg(9, tBuffer);
+        holder.getKernel().setArg(10, semBuffer);
 
         auto start = chrono::steady_clock::now();
         int correctOutputNumber = 0;
@@ -150,7 +134,7 @@ void testNetwork(std::string testName, float precision) {
 
             bool isOutputCorrect = true;
             for (int j = 0; j < predictedOutput.size(); ++j) {
-                isOutputCorrect = isOutputCorrect && (predictedOutput[j] - expectedOutputs[i][j]) < precision;
+                isOutputCorrect = isOutputCorrect && abs(predictedOutput[j] - expectedOutputs[i][j]) < precision;
             }
             if (isOutputCorrect) {
                 ++correctOutputNumber;
@@ -167,7 +151,7 @@ void testNetwork(std::string testName, float precision) {
 }
 
 int main(){
-    testNetwork("res/network_test", 1e-5);
+//    testNetwork("res/network_test", 1e-5);
     testNetwork("res/network", 0.45);
     return 0;
 }
