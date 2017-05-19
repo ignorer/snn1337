@@ -11,6 +11,10 @@ module example_tb;
   parameter FLOAT_WIDTH = INT_WIDTH * 2;
   parameter FLOAT_MSB = FLOAT_WIDTH - 1;
   
+  localparam CMD_WIDTH = INT_WIDTH;
+  
+  localparam CMD_CLEAR = (1 << CMD_WIDTH) - 3;
+  
   logic clk;
   logic rst;
 
@@ -83,6 +87,8 @@ module example_tb;
     #5ns;
     set_weight(1, 1, 7);
     set_weight(1, 2, 7); 
+    set_weight(1, CMD_CLEAR, 0);
+    set_weight(1, 0, 0);
     
   end
 

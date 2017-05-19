@@ -9,12 +9,10 @@ vlog -sv +incdir+./ ./spiking_example_network_tb.sv
 vsim -t 1ns -voptargs="+acc" example_network_tb
 add wave /example_network_tb/clk
 add wave /example_network_tb/rst
-add wave /example_network_tb/neural_network/in1
-add wave /example_network_tb/neural_network/in2
+add wave /example_network_tb/neural_network/in
+add wave /example_network_tb/neural_network/neuron_0_out
 add wave -radix decimal /example_network_tb/neural_network/counter
 add wave -radix decimal /cmd
-add wave /example_network_tb/neural_network/neuron_0_1_out
-add wave /example_network_tb/neural_network/neuron_0_2_out
 add wave /example_network_tb/neural_network/neuron_1_out
 add wave /example_network_tb/neural_network/neuron_2_out
 add wave /example_network_tb/neural_network/neuron_3_out

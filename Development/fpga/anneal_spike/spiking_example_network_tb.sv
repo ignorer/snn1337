@@ -5,18 +5,21 @@
   end
 
 module example_network_tb;
-  parameter INT_WIDTH = 4;
+  parameter INT_WIDTH = 8;
   parameter INT_MSB = INT_WIDTH - 1;
   parameter INT_MAX = (1 << INT_WIDTH) - 1;
   
   parameter FLOAT_WIDTH = INT_WIDTH * 2;
   
-  parameter CMD_WIDTH = 3;
-  parameter ADDR_WIDTH = 3;
+  parameter CMD_WIDTH = 8;
+  parameter ADDR_WIDTH = 8;
   
   localparam CMD_SET_DELIVERY_TIME = (1 << CMD_WIDTH) - 1;
   localparam CMD_SET_BIAS = (1 << CMD_WIDTH) - 2;
   localparam CMD_CLEAR = (1 << CMD_WIDTH) - 3;
+  
+  localparam CMD_SET_INPUT_TRAIN_LENGTH = (1 << CMD_WIDTH) - 4;
+  localparam CMD_SET_INPUT_TRAIN_FREQUENCY = (1 << CMD_WIDTH) - 5;
 
   logic clk;
   logic rst;
@@ -31,15 +34,15 @@ module example_network_tb;
   
   spiking_neural_network_xor #(
     .INT_WIDTH(INT_WIDTH),
+    .CMD_WIDTH(CMD_WIDTH),
+    .ADDR_WIDTH(ADDR_WIDTH),
     .SILENT(1)
   ) neural_network(
     .clk(clk),
     .rst(rst),
     .addr(addr), .cmd(cmd), .cmd_arg(weight),
-    .in1(neural_nework_in1),
-    .in2(neural_nework_in2),
-    .out(neural_nework_out),
-    .out_time(neural_network_out_time)
+    .in({neural_nework_in1, neural_nework_in2}),
+    .out(neural_nework_out)
   );
   
   task run_cmd;
@@ -103,10 +106,14 @@ module example_network_tb;
       run_cmd(7, 2, INT_MAX);
       run_cmd(7, CMD_SET_DELIVERY_TIME, 2);
       
-      cmd = CMD_CLEAR;
-      #20ns;
-      cmd = 0;
+      run_cmd(0, CMD_SET_INPUT_TRAIN_LENGTH, 10);
       
+      run_cmd(1, CMD_SET_INPUT_TRAIN_FREQUENCY, INT_MAX * 0.3333);
+      run_cmd(2, CMD_SET_INPUT_TRAIN_FREQUENCY, INT_MAX * 0.5);
+      
+      run_cmd(1, CMD_CLEAR, 0);
+      run_cmd(1, 0, 0);
+    
       #700ns; // wait for calculations
             
       `assert_equal(expected, neural_nework_out);

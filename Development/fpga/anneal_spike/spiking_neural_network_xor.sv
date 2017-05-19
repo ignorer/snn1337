@@ -18,6 +18,8 @@ module spiking_neural_network_xor(clk, rst, addr, cmd, cmd_arg, in, out);
   localparam CMD_SET_DELIVERY_TIME = 2 + 1;
   localparam CMD_SET_BIAS = 2 + 2;
   localparam CMD_CLEAR = (1 << CMD_WIDTH) - 3;
+  localparam CMD_SET_INPUT_TRAIN_LENGTH = (1 << CMD_WIDTH) - 4;
+  localparam CMD_SET_INPUT_TRAIN_FREQUENCY = (1 << CMD_WIDTH) - 5;
   
   parameter SILENT = 1;
   
@@ -37,6 +39,11 @@ module spiking_neural_network_xor(clk, rst, addr, cmd, cmd_arg, in, out);
   
   reg[31:0] counter;
   
+  reg[FLOAT_WIDTH - 1 : 0] input_train_frequency[2:1];
+  reg[FLOAT_WIDTH - 1 : 0] input_train_actual_frequency[2:1];
+  reg[INT_WIDTH - 1 : 0] input_train_length;
+  reg[INT_WIDTH - 1 : 0] input_train_actual_length;
+    
   reg [2:1] neuron_0_out;
     
   wire neuron_1_out;
@@ -96,6 +103,14 @@ module spiking_neural_network_xor(clk, rst, addr, cmd, cmd_arg, in, out);
     counter = -1;
     out = 1'b z;
     neuron_0_out = 0;
+    
+    for (int i = 1; i <= 2; i++)
+    begin
+      input_train_frequency[i] = 0;
+      input_train_actual_frequency[i] = (1 << INT_WIDTH);
+    end
+    input_train_length = 1;
+    input_train_actual_length = input_train_length;
   end
   
   always @(posedge clk)
@@ -106,31 +121,55 @@ module spiking_neural_network_xor(clk, rst, addr, cmd, cmd_arg, in, out);
     begin
       counter = 0;
       out = 1'b z;
+      for (int i = 1; i <= 2; i++)
+      begin
+        input_train_actual_frequency[i] = (1 << INT_WIDTH);
+      end
+      input_train_actual_length = input_train_length;
     end
+    
+    if (cmd == CMD_SET_INPUT_TRAIN_LENGTH)
+      input_train_length = cmd_arg[INT_WIDTH - 1 : 0];
+      
+    if (cmd == CMD_SET_INPUT_TRAIN_FREQUENCY)
+      input_train_frequency[addr] = cmd_arg;
       
     if (cmd == 0)
     begin
-      case (counter)
-        0 : 
+      if (input_train_actual_length > 0)
+      begin
+        for (int i = 1; i <= 2; i++)
         begin
-          if (!SILENT) $display("Neural network: Start argument pulses");
-          neuron_0_out = in;
-        end
-        1 : 
-        begin
-          if (!SILENT) $display("Neural network: Finish argument pulses");
-          neuron_0_out = 0;
-        end  
-        MAX_TIME :
-        begin
-          
-          if (out === 1'b z)
+          if (input_train_actual_frequency[i] >= (1 << INT_WIDTH))
           begin
-            out = 0;
-            counter = counter - 1;
+            if (!SILENT) $display("Neural network: Start argument pulses");
+            neuron_0_out[i] = in[i];
+            input_train_actual_frequency[i] = 
+                input_train_actual_frequency[i][INT_WIDTH - 1 : 0];
           end
+          else
+          begin
+            if (!SILENT) $display("Neural network: Finish argument pulses");
+            neuron_0_out[i] = 0;
+          end 
+          input_train_actual_frequency[i] += input_train_frequency[i];
+        end 
+        input_train_actual_length -= 1;
+      end
+      else
+      begin
+        neuron_0_out = 0;
+      end
+        
+         
+      if (counter == MAX_TIME)
+      begin    
+        if (out === 1'b z)
+        begin
+          out = 0;
+          counter = counter - 1;
         end
-      endcase;
+      end
       if (out === 1'b z && (neuron_6_out || neuron_7_out))
       begin
         out = neuron_6_out ? 1 : 0;
