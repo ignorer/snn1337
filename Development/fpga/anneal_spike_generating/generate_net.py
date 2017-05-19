@@ -109,8 +109,6 @@ class SnnGenerator(object):
 
         return prev_layer_outputs
 
-
-
     def add_dense_layer(self, neurons_count):
         if self.previous_level is None:
             raise RuntimeError("add_input_layer should be called at first")
@@ -170,7 +168,6 @@ class SnnGenerator(object):
                 "OUTPUTS_COUNT": self.outputs_count
         })
 
-
         with open(dest, "w") as d:
             def generate_neurons():
                 gnd = lambda *args: d.write(
@@ -183,8 +180,6 @@ class SnnGenerator(object):
                         self._generate_neuron(len(neuron[1]))
                         neurons_input_counts.add(len(neuron[1]))
                     gnd(*neuron)
-
-
 
             template_locals["GENERATE_NEURONS"] = generate_neurons
 
@@ -217,21 +212,19 @@ class SnnGenerator(object):
                                 multiline_paste + "...end of paste\n"
                     raise
 
+if __name__ == "__main__":
+    net = SnnGenerator(
+            net_module_name="spiking_sum_net",
+            destination_file="spiking_sum_net.sv",
+            template_file="spiking_neural_network.sv.template",
+            neuron_template_file="spiking_neuron.sv.template")
 
+    net.add_input_layer(8)
 
+    net.add_dense_layer(16)
 
-net = SnnGenerator(
-        net_module_name="spiking_sum_net",
-        destination_file="snn.sv",
-        template_file="spiking_neural_network.sv.template",
-        neuron_template_file="spiking_neuron.sv.template")
+    net.add_dense_layer(16)
 
-net.add_input_layer(2)
+    net.add_output_level(8)
 
-net.add_dense_layer(3)
-
-net.add_dense_layer(1)
-
-net.add_output_level(2)
-
-net.generate_net_code()
+    net.generate_net_code()
