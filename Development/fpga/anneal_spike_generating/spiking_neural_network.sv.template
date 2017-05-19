@@ -23,6 +23,8 @@ __PYTHON_PASTE__"module %s(" % NET_MODULE_NAME
   localparam CMD_SET_DELIVERY_TIME = NEURON_INPUTS_COUNT + 1;
   localparam CMD_SET_BIAS = NEURON_INPUTS_COUNT + 2;
   localparam CMD_CLEAR = (1 << CMD_WIDTH) - 3;
+  localparam CMD_SET_INPUT_TRAIN_LENGTH = (1 << CMD_WIDTH) - 4;
+  localparam CMD_SET_INPUT_TRAIN_FREQUENCY = (1 << CMD_WIDTH) - 5;
   
   parameter SILENT = 1;
   
@@ -46,6 +48,11 @@ __PYTHON_PASTE__"module %s(" % NET_MODULE_NAME
   input reg [FLOAT_WIDTH - 1 : 0] cmd_arg;
   
   reg[31:0] counter;
+  
+  reg[FLOAT_WIDTH - 1 : 0] input_train_frequency[1:INPUTS_COUNT];
+  reg[FLOAT_WIDTH - 1 : 0] input_train_actual_frequency[1:INPUTS_COUNT];
+  reg[INT_WIDTH - 1 : 0] input_train_length;
+  reg[INT_WIDTH - 1 : 0] input_train_actual_length;
   
   reg [1:INPUTS_COUNT] inputs_level;
   reg [1:OUTPUT_NEURONS_COUNT] outputs_level;
@@ -85,6 +92,14 @@ __PYTHON_EXEC_END__
     for (int i = 0; i <= OUTPUTS_COUNT; i++)
       out[i] = 1'b z;
     inputs_level = 0;
+    
+    for (int i = 1; i <= INPUTS_COUNT; i++)
+    begin
+      input_train_frequency[i] = 0;
+      input_train_actual_frequency[i] = (1 << INT_WIDTH);   
+    end
+    input_train_length = 1;
+    input_train_actual_length = input_train_length;
   end
   
   reg out_ready;
@@ -96,29 +111,57 @@ __PYTHON_EXEC_END__
       counter = 0;
       for (int i = 0; i <= OUTPUTS_COUNT; i++)
         out[i] = 1'b z;
+      for (int i = 1; i <= INPUTS_COUNT; i++)
+      begin
+        input_train_actual_frequency[i] = (1 << INT_WIDTH);
+      end
+      input_train_actual_length = input_train_length;
     end
+    
+    if (cmd == CMD_SET_INPUT_TRAIN_LENGTH)
+      input_train_length = cmd_arg[INT_WIDTH - 1 : 0];
+      
+    if (cmd == CMD_SET_INPUT_TRAIN_FREQUENCY)
+      input_train_frequency[addr] = cmd_arg;
       
     if (cmd == 0)
     begin
-      case (counter)
-        0 : 
+	  if (input_train_actual_length > 0)
+      begin
+        for (int i = 1; i <= INPUTS_COUNT; i++)
         begin
-          inputs_level = in;
-        end
-        1 : 
-        begin
-          inputs_level = 0;
-        end  
-        MAX_TIME :
-        begin
-          for (int i = 1; i <= OUTPUTS_COUNT; i++)
+          if (input_train_actual_frequency[i] >= (1 << INT_WIDTH))
           begin
-            if (out[i] === 1'b z)
-              out[i] = 0;
+            if (!SILENT) $display("Neural network: Start argument pulses");
+            inputs_level[i] = in[i];
+            input_train_actual_frequency[i] = 
+                input_train_actual_frequency[i][INT_WIDTH - 1 : 0];
           end
-          counter = MAX_TIME - 1;
+          else
+          begin
+            if (!SILENT) $display("Neural network: Finish argument pulses");
+            inputs_level[i] = 0;
+          end 
+          input_train_actual_frequency[i] += input_train_frequency[i];
+        end 
+        input_train_actual_length -= 1;
+      end
+      else
+      begin
+        inputs_level = 0;
+      end
+        
+         
+      if (counter == MAX_TIME)
+      begin    
+        for (int i = 1; i <= OUTPUTS_COUNT; i++)
+        begin
+          if (out[i] === 1'b z)
+            out[i] = 0;
         end
-      endcase;
+        counter = MAX_TIME - 1;
+      end
+    
       out_ready = 1;
       for (int i = 1; i <= OUTPUTS_COUNT; i++)
       begin
@@ -129,7 +172,7 @@ __PYTHON_EXEC_END__
       end
       if (out_ready)
         out[0] = 1;
-    counter = counter + 1;
+      counter = counter + 1;
     end    
   end
   

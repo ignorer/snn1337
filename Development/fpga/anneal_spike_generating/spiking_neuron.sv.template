@@ -20,7 +20,9 @@ __PYTHON_PASTE__"module spiking_neuron_%din(" % IN_COUNT
   localparam CMD_MSB = CMD_WIDTH - 1;
   localparam CMD_SET_DELIVERY_TIME = INPUTS_COUNT + 1;
   localparam CMD_SET_BIAS = INPUTS_COUNT + 2;
-  localparam CMD_CLEAR = (1 << CMD_WIDTH) - 3;
+  localparam CMD_CLEAR = (1 << CMD_WIDTH) - 3; 
+  localparam CMD_SET_INPUT_TRAIN_LENGTH = (1 << CMD_WIDTH) - 4;
+  localparam CMD_SET_INPUT_TRAIN_FREQUENCY = (1 << CMD_WIDTH) - 5;
   
   // int and float[0; 1) width
   parameter INT_WIDTH = 8;
