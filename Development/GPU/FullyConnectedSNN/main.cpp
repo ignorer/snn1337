@@ -49,7 +49,7 @@ ClStructHolder buildCLHolder(const char* kernelFileName, vector<float>& weights,
     return ClStructHolder(context, queue, kernel, threadNumber);
 }
 
-void processSingleInput(ClStructHolder& holder, vector<int>& sizes, vector<float>& input, vector<float>& output, vector<int> spikes) {
+int processSingleInput(ClStructHolder& holder, vector<int>& sizes, vector<int>& input, vector<int>& output, vector<int> spikes) {
     cl::Context context = holder.getContext();
     cl::CommandQueue queue = holder.getQueue();
     cl::Kernel kernel = holder.getKernel();
@@ -67,6 +67,20 @@ void processSingleInput(ClStructHolder& holder, vector<int>& sizes, vector<float
     queue.finish();
 
     cl::copy(queue, outputBuffer, output.begin(), output.end());
+    int maxSpikeTrainSize = 0;
+    int maxSpikeTrainId = 0;
+    int curSpikeTrainSize = 0;
+    for (int i = 0; i < output.size(); i++) {
+        if (output[i] == -1) {
+            if (curSpikeTrainSize > maxSpikeTrainSize) {
+                maxSpikeTrainSize = curSpikeTrainSize;
+                maxSpikeTrainId = i;
+            }
+            curSpikeTrainSize = 0;
+        } else
+            curSpikeTrainSize += 1;
+    }
+    return maxSpikeTrainId;
 }
 
 void testNetwork(std::string testName, float precision) {
@@ -76,17 +90,18 @@ void testNetwork(std::string testName, float precision) {
     InputReader ir;
     ir.read();
     vector<vector<int>> trainImagesData = ir.getTestImagesData();
-    vector<vector<int>> inputs ;
+    vector<vector<int>> inputs;
     for(int i = 0; i < trainImagesData.size(); ++i) {
         inputs.push_back(ir.getFrequencies(trainImagesData[i]));
     }
 
     vector<int> layerSizes = network.getSizes();
     vector<float> weights = network.getAllWeights();
-    vector<vector<int>> expectedOutputs ;
-    for (int i = 0; i < trainImagesData.size(); ++i) {
-        expectedOutputs.push_back(ir.getTestImagesLabels());
-    }
+    vector<int> expectedOutputs ;
+//    for (int i = 0; i < trainImagesData.size(); ++i) {
+//        expectedOutputs.push_back(ir.getTestImagesLabels());
+//    }
+    expectedOutputs = ir.getTestImagesLabels();
     vector<int> spikes;
     vector<float> potentials;
     vector<int> t(1);
@@ -101,9 +116,8 @@ void testNetwork(std::string testName, float precision) {
         numberOfSpikes += layerSizes[i]*layerSizes[i+1];
     }
     numberOfSpikes *= synapsesPerConnection*spikesPerSynapse;
-    spikes.resize(numberOfSpikes, -100);
-    int maxSpikesInLayer = *max_element(layerSizes.begin(), layerSizes.end()) * synapsesPerConnection * spikesPerSynapse;
-    potentials.resize((unsigned int)maxSpikesInLayer, 0.);
+    spikes.resize(numberOfSpikes, -1);
+    potentials.resize(numberOfSpikes, 0.);
 
     try {
         ClStructHolder holder = buildCLHolder("neuron.cl", weights, layerSizes, "neuron");
@@ -124,25 +138,25 @@ void testNetwork(std::string testName, float precision) {
 
         auto start = chrono::steady_clock::now();
         int correctOutputNumber = 0;
-        int imagesNumber = inputs.size();
-        for (size_t i = 0; i < inputs.size(); ++i) {
-            vector<float> input;
+        int testsNumber = inputs.size() / 100;
+        cout << "Testing on " << testsNumber << " images...";
+        for (size_t i = 0; i < testsNumber; ++i) {
+            vector<int> input;
             input.push_back(1);
             input.insert(input.end(), inputs[i].begin(), inputs[i].end());
-            vector<float> predictedOutput(layerSizes.back());
-            processSingleInput(holder, layerSizes, input, predictedOutput, spikes);
-
-            bool isOutputCorrect = true;
-            for (int j = 0; j < predictedOutput.size(); ++j) {
-                isOutputCorrect = isOutputCorrect && abs(predictedOutput[j] - expectedOutputs[i][j]) < precision;
-            }
+            vector<int> output(layerSizes.back() * exitTime, -1);
+            int predictedOutput = processSingleInput(holder, layerSizes, input, output, spikes);
+            cout << "Test " << i <<". ";
+            cout << "Predicted: " << predictedOutput << ", ";
+            cout << "expected: " << expectedOutputs[i] << endl;
+            bool isOutputCorrect = (predictedOutput == expectedOutputs[i]);
             if (isOutputCorrect) {
                 ++correctOutputNumber;
             }
         }
         cout << "Testing \"" << testName << "\" with precision " << precision << "..." << endl;
         cout << "Time: " << chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start).count() << endl;
-        cout << "Accuracy: " << float(correctOutputNumber) / imagesNumber * 100.0 << endl;
+        cout << "Accuracy: " << float(correctOutputNumber) / testsNumber * 100.0 << endl;
     } catch (const cl::Error& e) {
         cerr << errCode(e.err()) << endl;
     } catch (const exception& e) {
@@ -151,7 +165,7 @@ void testNetwork(std::string testName, float precision) {
 }
 
 int main(){
-//    testNetwork("res/network_test", 1e-5);
+//   testNetwork("res/network_test", 0.45);
     testNetwork("res/network", 0.45);
     return 0;
 }
