@@ -57,10 +57,11 @@ int calcSpikesNum(Network* net) {
 }
 
 int calcLayerId(__global const int* layerSizes, int globalId) {
+    int layers = 0;
     int result = 0;
-    do {
-        globalId -= layerSizes[++result];
-    } while (globalId >= 0);
+    while (layers < globalId){
+        layers += layerSizes[result++];
+    }
     return result;
 }
 
@@ -121,12 +122,14 @@ void fire(Network* net, Neuron* neuron, int time) {
     if (neuron->prevLayer->id == -1) { // input
         size_t encInputSize = net->layerSizes[0] * net->synPerConn * net->spikesPerSyn;
         int freq = 0;
-        for (i = 0; i < encInputSize; i++) {
+        int t = 0;
+        while(t < encInputSize && *net->input > 0) {
             freq += *net->input;
             net->input += 1;
             if (freq / 1000 > 0)
-                neuron->spikes[i] = time;
-                freq = freq % 1000;
+                neuron->spikes[t++] = i;
+            freq = freq % 1000;
+            i++;
         }
         return;
     }

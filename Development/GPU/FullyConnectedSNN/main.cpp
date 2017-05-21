@@ -67,6 +67,9 @@ int processSingleInput(ClStructHolder& holder, vector<int>& sizes, vector<int>& 
     queue.finish();
 
     cl::copy(queue, outputBuffer, output.begin(), output.end());
+//    for (auto e : output)
+//        cout << e;
+//    cout << endl;
     int maxSpikeTrainSize = 0;
     int maxSpikeTrainId = 0;
     int curSpikeTrainSize = 0;
@@ -98,9 +101,6 @@ void testNetwork(std::string testName, float precision) {
     vector<int> layerSizes = network.getSizes();
     vector<float> weights = network.getAllWeights();
     vector<int> expectedOutputs ;
-//    for (int i = 0; i < trainImagesData.size(); ++i) {
-//        expectedOutputs.push_back(ir.getTestImagesLabels());
-//    }
     expectedOutputs = ir.getTestImagesLabels();
     vector<int> spikes;
     vector<float> potentials;
@@ -138,7 +138,7 @@ void testNetwork(std::string testName, float precision) {
 
         auto start = chrono::steady_clock::now();
         int correctOutputNumber = 0;
-        int testsNumber = inputs.size() / 100;
+        int testsNumber = inputs.size() / 1000;
         cout << "Testing on " << testsNumber << " images...";
         for (size_t i = 0; i < testsNumber; ++i) {
             vector<int> input;
@@ -146,9 +146,9 @@ void testNetwork(std::string testName, float precision) {
             input.insert(input.end(), inputs[i].begin(), inputs[i].end());
             vector<int> output(layerSizes.back() * exitTime, -1);
             int predictedOutput = processSingleInput(holder, layerSizes, input, output, spikes);
-            cout << "Test " << i <<". ";
-            cout << "Predicted: " << predictedOutput << ", ";
-            cout << "expected: " << expectedOutputs[i] << endl;
+//            cout << "Test " << i <<". ";
+//            cout << "Predicted: " << predictedOutput << ", ";
+//            cout << "expected: " << expectedOutputs[i] << endl;
             bool isOutputCorrect = (predictedOutput == expectedOutputs[i]);
             if (isOutputCorrect) {
                 ++correctOutputNumber;
