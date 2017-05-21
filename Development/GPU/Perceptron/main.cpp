@@ -222,7 +222,63 @@ void testDigitsBatched(int batchSize, bool workGroupSizeisOne = false) {
     }
 }
 
+void test(){
+    vector<int> results;
+    results.resize(2, 0);
+    const char filename[] = "batchedNeuronTests.cl";
+    const char functionName[] = "tests";
+    vector<int> a = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+    vector<int> b = {11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
+    cout << "hello" << endl;
+
+    try{
+        cl::Device defaultDevice = cl::Device::getDefault();
+        cl::Context context(defaultDevice);
+        cl::CommandQueue queue(context, defaultDevice);
+
+        ifstream sourceFile(filename);
+        string sourceCode(istreambuf_iterator<char>(sourceFile), (std::istreambuf_iterator<char>()));
+        cl::Program::Sources source(1, make_pair(sourceCode.c_str(), sourceCode.length()+1));
+        cl::Program program = cl::Program(context, source);
+        try {
+            program.build({defaultDevice});
+        }
+        catch(cl::Error& error) {
+            string buildLog;
+            program.getBuildInfo(defaultDevice, CL_PROGRAM_BUILD_LOG, &buildLog);
+            throw runtime_error(buildLog);
+        }
+
+        cl::Kernel kernel(program, functionName);
+
+        size_t threadNumber = 1;
+        cl::Buffer aBuffer(context, a.begin(), a.end(), true);
+        cl::Buffer bBuffer(context, b.begin(), b.end(), true);
+        cl::Buffer resultsBuffer(context, results.begin(), results.end(), true);
+
+        kernel.setArg(0, aBuffer);
+        kernel.setArg(1, bBuffer);
+        kernel.setArg(2, resultsBuffer);
+
+        cout << "hello" << endl;
+
+        queue.enqueueNDRangeKernel(kernel, cl::NullRange, 1, cl::NDRange(1));
+        queue.finish();
+        cl::copy(queue, resultsBuffer, results.begin(), results.end());
+        for(int i = 0; i < 2; ++i){
+            cout << results[i] << endl;
+            if(results[i] == 0){
+                cout << "we have some trouble in function number" << i << endl;
+            }
+        }
+    }catch (const cl::Error& e){
+        cerr << errCode(e.err()) << endl;
+    }
+}
+
+
 int main() {
-    testDigitsBatched(1000, true);
+    //testDigitsBatched(1000, true);
+    test();
     return 0;
 }
