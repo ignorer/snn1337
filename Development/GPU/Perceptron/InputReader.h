@@ -29,6 +29,7 @@ class InputReader {
   public:
     void read();
 
+    static float castToFloat(int c);
     static int castToInt(unsigned char c);
     static vector<int> castVectorToVectorOfInt(vector<unsigned char> c);
     static vector<int> getFrequencies(vector<int> pixels);

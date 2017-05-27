@@ -6,6 +6,10 @@ int InputReader::castToInt(unsigned char c) {
     return int(c);
 }
 
+float InputReader::castToFloat(int c) {
+    return float(c);
+}
+
 vector<int> InputReader::castVectorToVectorOfInt(vector<unsigned char> c) {
     vector<int> transformed(c.size());
     transform(c.begin(), c.end(), transformed.begin(), castToInt);
