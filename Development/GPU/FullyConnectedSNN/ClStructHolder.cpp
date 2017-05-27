@@ -1,9 +1,6 @@
-//
-// Created by mariia on 22.04.2017.
-//
-#include <cl.hpp>
 #include "ClStructHolder.h"
 
+#include <cl.hpp>
 
 ClStructHolder::ClStructHolder(cl::Context context, cl::CommandQueue queue, cl::Kernel kernel, size_t threadNumber) :
         context(context),
