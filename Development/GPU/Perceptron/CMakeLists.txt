@@ -13,4 +13,4 @@ target_link_libraries(Perceptron ${OpenCL_LIBRARY})
 file(COPY batchedNeuron.cl DESTINATION .)
 # copy resources to working directory
 file(COPY res/network_mnist DESTINATION .)
-file(COPY ../mnist DESTINATION .)
+file(COPY ${GPU_SOURCE_DIR}/datasets/mnist DESTINATION .)

@@ -47,35 +47,8 @@ FullyConnectedNN loadFullyConnectedNN(const string& filename) {
     return FullyConnectedNN(layers);
 }
 
-ClStructHolder buildClHolder(string kernelFileName, const vector<int>& layerSizes, const vector<float>& weights,
-        const char* functionName) {
-    cl::Device defaultDevice = cl::Device::getDefault();
-    cl::Context context(defaultDevice);
-    cl::CommandQueue queue(context, defaultDevice);
-
-    ifstream sourceFile(kernelFileName);
-    string sourceCode(istreambuf_iterator<char>(sourceFile), (istreambuf_iterator<char>()));
-    cl::Program::Sources source(1, make_pair(sourceCode.c_str(), sourceCode.length() + 1));
-    cl::Program program = cl::Program(context, source);
-
-    try {
-        program.build({defaultDevice});
-    }
-    catch (cl::Error& error) {
-        string buildLog;
-        program.getBuildInfo(defaultDevice, CL_PROGRAM_BUILD_LOG, &buildLog);
-        throw runtime_error(buildLog);
-    }
-
-    cl::Kernel kernel(program, functionName);
-
-    size_t threadNumber = accumulate(layerSizes.begin() + 1, layerSizes.end(), 0ul);
-
-    return ClStructHolder(context, queue, kernel, threadNumber);
-}
-
-float accuracyDigits(vector<vector<float>> outputs, vector<int> expectedOutputs,
-                     int batchSize, int batch_number) {
+float calculateAccuracyDigits(vector<vector<float>> outputs, vector<int> expectedOutputs,
+        int batchSize, int batch_number) {
     float correctOutputNumber = 0;
     for (size_t i = 0; i < batchSize; ++i) {
         vector<float> predictedOutputs = outputs[i];
@@ -105,7 +78,7 @@ int getMaximumWorkGroupSize(int unitsNumber) {
 }
 
 vector<vector<float>> processMultipleInputs(ClStructHolder& holder, vector<int>& layerSizes, vector<float>& weights,
-        vector<vector<float>>& inputs, int batchSize, int batchNumber, bool workGroupSizeisOne = false) {
+        vector<vector<float>>& inputs, int batchSize, int batchNumber, bool workGroupSizeIsOne = false) {
     if (layerSizes.size() == 0) {
         return {};
     }
@@ -149,18 +122,17 @@ vector<vector<float>> processMultipleInputs(ClStructHolder& holder, vector<int>&
         // TODO: switch to layerSizes[layerId + 1] * batchSize after properly implementing getMaximumWorkersNumber
         int unitsNumber = getMaximumWorkersNumber(layerSizes[layerId + 1]);
         int workGroupSize = 1;
-        if (!workGroupSizeisOne) {
+        if (!workGroupSizeIsOne) {
             workGroupSize = getMaximumWorkGroupSize(unitsNumber);
         }
 
         cout << "unitsNumber for layer " << layerId << ": " << unitsNumber << endl;
         cout << "workGroupSize for layer " << layerId << ": " << workGroupSize << endl;
 
-        if (workGroupSizeisOne) {
+        if (workGroupSizeIsOne) {
             kernel.setArg(8, cl::Local(sizeof(float) * (layerSizes[layerId] + 1)));
         }
-        queue.enqueueNDRangeKernel(holder.getKernel(), cl::NullRange, cl::NDRange(unitsNumber),
-            cl::NDRange(workGroupSize));
+        queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(unitsNumber), cl::NDRange(workGroupSize));
         queue.finish();
 
         weightsOffset += (layerSizes[layerId] + 1) * layerSizes[layerId + 1];
@@ -177,7 +149,7 @@ vector<vector<float>> processMultipleInputs(ClStructHolder& holder, vector<int>&
     return outputs;
 }
 
-void testDigitsBatched(int batchSize, bool workGroupSizeisOne = false) {
+void testDigitsBatched(int batchSize, cl_device_type deviceType, bool workGroupSizeisOne = false) {
     FullyConnectedNN network = loadFullyConnectedNN("network_mnist");
     InputReader ir;
     ir.read();
@@ -189,10 +161,9 @@ void testDigitsBatched(int batchSize, bool workGroupSizeisOne = false) {
     vector<int> expectedOutputs = ir.getTestImagesLabels();
 
     try {
-        ClStructHolder holder = buildClHolder("batchedNeuron.cl", layerSizes, weights, "batchedNeuron");
-        if (workGroupSizeisOne) {
-            holder = buildClHolder("batchedNeuron.cl", layerSizes, weights, "batchedNeuronLocal");
-        }
+        ClStructHolder holder = workGroupSizeisOne ?
+                ClStructHolder("batchedNeuron.cl", layerSizes, weights, "batchedNeuronLocal", deviceType) :
+                ClStructHolder("batchedNeuron.cl", layerSizes, weights, "batchedNeuron", deviceType);
         cl::Buffer layersSizesBuffer(holder.getContext(), layerSizes.begin(), layerSizes.end(), true);
         cl::Buffer weightsBuffer(holder.getContext(), weights.begin(), weights.end(), true);
         holder.getKernel().setArg(0, layersSizesBuffer);
@@ -208,7 +179,7 @@ void testDigitsBatched(int batchSize, bool workGroupSizeisOne = false) {
         for (int i = 0; i < imagesNumber / batchSize; i++) {
             auto outputs = processMultipleInputs(holder, layerSizes, weights, inputs, batchSize, i,
                 workGroupSizeisOne);
-            accuracy += accuracyDigits(outputs, expectedOutputs, batchSize, i);
+            accuracy += calculateAccuracyDigits(outputs, expectedOutputs, batchSize, i);
             cout << "batch " << i << " accuracy: " <<  accuracy / (i + 1) << endl;
         }
 
@@ -223,6 +194,6 @@ void testDigitsBatched(int batchSize, bool workGroupSizeisOne = false) {
 }
 
 int main() {
-    testDigitsBatched(1000, true);
+    testDigitsBatched(10000, CL_DEVICE_TYPE_GPU, true);
     return 0;
 }

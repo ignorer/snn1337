@@ -1,6 +1,6 @@
 float dotProduct(__global const float* a, __global const float* b, size_t size) {
     float res = 0;
-    for (size_t i = 0; i < size; i++) {
+    for (size_t i = 0; i < size; ++i) {
         res += a[i] * b[i];
     }
     return res;
@@ -8,7 +8,7 @@ float dotProduct(__global const float* a, __global const float* b, size_t size) 
 
 float dotProductLocal(__local const float* a, __global const float* b, size_t size) {
     float res = 0;
-    for (size_t i = 0; i < size; i++) {
+    for (size_t i = 0; i < size; ++i) {
         res += a[i] * b[i];
     }
     return res;
