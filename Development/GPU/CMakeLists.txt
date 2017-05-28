@@ -5,5 +5,7 @@ set(CMAKE_CXX_STANDARD 14)
 
 find_package(OpenCL)
 
-add_subdirectory(FullyConnectedSNN)
 add_subdirectory(Perceptron)
+add_subdirectory(FullyConnectedSNN)
+add_subdirectory(ConvolutionalSNN)
+
