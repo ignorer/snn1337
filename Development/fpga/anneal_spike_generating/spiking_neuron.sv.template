@@ -1,0 +1,192 @@
+/*
+Example for generating
+CS = comma-separated
+*/
+
+__PYTHON_PASTE__"module spiking_neuron_%din(" % IN_COUNT
+    clk, rst, addr, cmd, cmd_arg, 
+    __PYTHON_PASTE__"    " + ", ".join(["in" + str(i) for i in IN_NUMS]) + ","
+    out);
+  
+  parameter NEURON_ID = -1;
+  parameter SILENT = 1;
+  
+  __PYTHON_PASTE__"  parameter INPUTS_COUNT = " + str(IN_COUNT) + ";"
+  
+  parameter ADDR_WIDTH = 16;
+  localparam ADDR_MSB = ADDR_WIDTH - 1;
+  
+  parameter CMD_WIDTH = 8;
+  localparam CMD_MSB = CMD_WIDTH - 1;
+  localparam CMD_SET_DELIVERY_TIME = INPUTS_COUNT + 1;
+  localparam CMD_SET_BIAS = INPUTS_COUNT + 2;
+  localparam CMD_CLEAR = (1 << CMD_WIDTH) - 3; 
+  localparam CMD_SET_INPUT_TRAIN_LENGTH = (1 << CMD_WIDTH) - 4;
+  localparam CMD_SET_INPUT_TRAIN_FREQUENCY = (1 << CMD_WIDTH) - 5;
+  
+  // int and float[0; 1) width
+  parameter INT_WIDTH = 8;
+  localparam INT_MSB = INT_WIDTH - 1;
+  localparam INT_MAX = (1 << INT_WIDTH) - 1;
+  
+  // float with fixed point
+  localparam FLOAT_WIDTH = INT_WIDTH * 2;
+  localparam FLOAT_MSB = FLOAT_WIDTH - 1;
+  
+  parameter OVERFLOW_WIDTH = 8; // upper rounding of log2 of arguments count
+  
+  parameter COMPENSATION_WEIGHT = INT_MAX * INPUTS_COUNT; 
+  parameter OUT_BARRIER = INT_MAX * 0.5; // fire if weighted sum is greater than it
+  
+  
+  input wire clk;
+  input wire rst;
+  
+  input wire [ADDR_MSB:0] addr;
+  input wire [CMD_MSB:0] cmd;
+  input wire [FLOAT_MSB:0] cmd_arg;
+  
+  __PYTHON_PASTE__"\n".join(["  reg signed[FLOAT_MSB:0] in%d_weight;" % i for i in IN_NUMS])
+  
+  reg signed[FLOAT_MSB:0] bias_weight;
+  
+  reg [INT_MSB:0] delivery_time;
+  
+  __PYTHON_PASTE__"\n".join(["  input wire in" + str(i) + ";" for i in IN_NUMS])
+  
+  
+  output reg out;
+  
+  localparam SIGN_WIDTH = 1;
+  localparam SUM_WIDTH = INT_WIDTH * 2 + OVERFLOW_WIDTH + SIGN_WIDTH;
+  localparam SUM_MSB = SUM_WIDTH - 1;
+  
+  localparam SIGN_MSB = SUM_MSB;
+  localparam SIGN_LSB = SUM_MSB - SIGN_WIDTH + 1;
+  localparam OVERFLOW_MSB = SIGN_LSB - 1;
+  localparam OVERFLOW_LSB = OVERFLOW_MSB - OVERFLOW_WIDTH + 1;
+  localparam SUM_NEEDED_MSB = OVERFLOW_LSB - 1;
+  localparam SUM_NEEDED_LSB = SUM_NEEDED_MSB - INT_WIDTH + 1;
+  
+  // note:
+  // [                             sum                        ]
+  // [sign      ] [overflow      ] [sum_needed] [not used     ]
+  //  SIGN_WIDTH   OVERFLOW_WIDTH   INT_WIDTH    INT_WIDTH * 2 
+  reg signed[SUM_MSB:0] sum;
+  
+  localparam SUM_PART_WIDTH = FLOAT_WIDTH + INT_WIDTH;
+  localparam SUM_PART_MSB = SUM_PART_WIDTH - 1;
+    
+  parameter STATE_SIZE = 4;
+  localparam STATE_MSB = STATE_SIZE - 1;
+  parameter STATE_GOOD_MAX = 4;
+  parameter STATE_NULL = 15;
+  
+  function signed[INT_MSB + 1:0] calc_time_weight;
+    input [STATE_MSB:0] state; // if little it is a time from getting an impulse
+    begin
+      case (state)
+        0 : calc_time_weight = INT_MAX * 0.7;
+        1 : calc_time_weight = INT_MAX * 1;
+        2 : calc_time_weight = INT_MAX * 0.6;
+        3 : calc_time_weight = INT_MAX * 0.3;
+        4 : calc_time_weight = INT_MAX * 0.1;  
+        default : calc_time_weight = 0;   
+      endcase
+    end
+  endfunction
+  
+  reg [STATE_MSB:0] state_out;
+  
+  __PYTHON_PASTE__"\n".join(["  reg [STATE_MSB:0] state" + str(i) + ";" for i in IN_NUMS])
+
+  reg is_negative;
+  reg is_overflow;
+  reg [INT_MSB:0] needed;
+  
+  reg [STATE_MSB:0] delivery_in;
+  
+  always @(posedge rst)
+  begin
+    if (!SILENT) $display("Start!!!");
+    delivery_in <= 0;
+    state_out <= STATE_NULL;
+    
+    __PYTHON_PASTE__"\n".join(["    state" + str(i) + " <= STATE_NULL;" for i in IN_NUMS])
+
+    out <= 0;
+    
+    __PYTHON_PASTE__"\n".join(["    in" + str(i) + "_weight <= INT_MAX / INPUTS_COUNT;" for i in IN_NUMS])
+
+    bias_weight <= 0;
+    delivery_time <= 1;
+  end
+  
+
+  always @(posedge clk)
+  begin
+    if (!SILENT) $display("Neuron #%2d: get cmd=%d, cmd_arg=%d", 
+        NEURON_ID,  cmd, cmd_arg);
+    if (cmd != 0 && (addr == NEURON_ID || cmd == CMD_CLEAR))
+    begin 
+      case (cmd)
+        __PYTHON_PASTE__"\n".join(["        " + str(i) + " : in" + str(i) + "_weight = cmd_arg;" for i in IN_NUMS])        
+     
+        CMD_SET_BIAS : bias_weight = cmd_arg;
+        CMD_SET_DELIVERY_TIME : delivery_time = cmd_arg[INT_MSB:0];
+        CMD_CLEAR : 
+        begin
+          delivery_in <= 0;
+          state_out <= STATE_NULL;
+		      __PYTHON_PASTE__"\n".join(["          state" + str(i) + " <= STATE_NULL;" for i in IN_NUMS])
+          out <= 0;
+        end
+        default : ;   
+      endcase
+    end
+      
+    if (cmd == 0)
+    begin
+      state_out = state_out < STATE_GOOD_MAX ? state_out + 1 : STATE_NULL;
+      
+      __PYTHON_PASTE__"\n".join(["      state%d = (in%d == 1) ? 0 : (state%d < STATE_GOOD_MAX ? state%d + 1 : STATE_NULL);" % ((i,) * 4) for i in IN_NUMS])
+      // state1 = (in1 == 1) ? 0 : (state1 < STATE_GOOD_MAX ? state1 + 1 : STATE_NULL);
+      
+      if (delivery_in != 0)
+      begin
+        if (!SILENT) $display("Delay shoot...");
+        if (delivery_in == 1)
+        begin
+          if (!SILENT) $display("Fire!!!");
+          out = 1;
+        end;
+        delivery_in = delivery_in - 1;
+      end
+      else
+      begin
+        out = 0;
+        
+        sum = -calc_time_weight(state_out) * COMPENSATION_WEIGHT;
+        sum += bias_weight * (1 << INT_WIDTH);
+        __PYTHON_PASTE__"\n".join(["        sum += calc_time_weight(state%d) * in%d_weight;" % (i, i) for i in IN_NUMS])
+        //sum += calc_time_weight(state1) * in1_weight;
+        
+        is_negative = (sum[SIGN_MSB:SIGN_LSB] != 0);
+        is_overflow = (sum[OVERFLOW_MSB:OVERFLOW_LSB] != 0);
+        needed = sum[SUM_NEEDED_MSB:SUM_NEEDED_LSB];
+    
+        sum = (is_negative ? 0 : (is_overflow ? INT_MAX : needed));
+      
+        if (sum > OUT_BARRIER)
+        begin
+          state_out = 0;  
+          if (delivery_time == 0)
+            out = 1;
+          else
+            delivery_in = delivery_time;
+        end
+      end
+    end    
+  end
+  
+endmodule
